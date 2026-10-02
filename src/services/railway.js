@@ -315,16 +315,27 @@ async function createServiceDomain(token, environmentId, serviceId) {
 }
 
 /**
- * Trigger Redeployment of a Service Instance
+ * Trigger Redeployment of a Service Instance (Pulls latest commit from GitHub)
  */
 async function triggerRedeploy(token, environmentId, serviceId) {
-  const query = `
+  const deployLatestQuery = `
+    mutation DeployLatest($serviceId: String!, $environmentId: String!, $latestCommit: Boolean) {
+      serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId, latestCommit: $latestCommit)
+    }
+  `;
+  try {
+    const res = await railwayGraphQL(token, deployLatestQuery, { environmentId, serviceId, latestCommit: true });
+    if (res?.serviceInstanceDeploy) return res;
+  } catch (err) {}
+
+  // Fallback to serviceInstanceRedeploy
+  const redeployQuery = `
     mutation Redeploy($environmentId: String!, $serviceId: String!) {
       serviceInstanceRedeploy(environmentId: $environmentId, serviceId: $serviceId)
     }
   `;
   try {
-    return await railwayGraphQL(token, query, { environmentId, serviceId });
+    return await railwayGraphQL(token, redeployQuery, { environmentId, serviceId });
   } catch (err) {
     return false;
   }
