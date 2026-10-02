@@ -164,26 +164,67 @@ async function handleListProjects(bot, chatId, messageId) {
 async function handleRestartProject(bot, chatId, projectId) {
   const state = getUserState(chatId);
   let token = state.data?.railwayToken || db.getSystemRailwayToken();
-  if (!token) return;
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu untuk merestart VPS.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
 
-  const loadMsg = await safeSendMessage(bot, chatId, `🔄 *Merestart / Redeploy VPS \`${projectId}\`...*`);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+  const sshHost = savedDep?.ssh_host || '-';
+  const sshPort = savedDep?.ssh_port || '22';
+  const ipDisplay = sshHost !== '-' ? `${sshHost}:${sshPort}` : '';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `🔄 *MEMULAI RESTART VPS...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`${ipDisplay ? ` (\`${ipDisplay}\`)` : ''}\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ Mengirim instruksi reboot / restart ke Railway Cloud...`
+  );
+
   try {
     const details = await railway.getProjectDetails(token, projectId);
     if (!details || !details.environmentId || !details.serviceId) {
-      throw new Error('Service atau Environment tidak ditemukan.');
+      throw new Error('Service atau Environment Railway tidak ditemukan.');
     }
+
     await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
-    safeEditMessage(bot, chatId, loadMsg.message_id, `✅ *VPS [${details.name || projectId}] sedang direstart!* \n\nContainer akan kembali online dalam 10-20 detik.`, {
+
+    const fullIp = details.tcpIp || details.tcpHost || savedDep?.ssh_host || '-';
+    const fullPort = details.tcpPort || savedDep?.ssh_port || '22';
+    const targetDisplay = fullIp !== '-' ? `${fullIp}:${fullPort}` : (details.name || vpsName);
+
+    const successText = `🔄 *PROSES RESTART VPS TELAH DIMULAI!*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${targetDisplay}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `⏳ *MOHON TUNGGU SEKITAR 2 MENIT:*\n` +
+      `• Server Railway sedang me-reboot & menginisialisasi ulang container Linux.\n` +
+      `• Proses startup OpenSSH server, Network Proxy & Web Dashboard membutuhkan waktu **sekitar 1 - 2 menit**.\n` +
+      `• IP Address, Port SSH, dan Password root *tetap sama & tidak berubah*.\n\n` +
+      `💡 _Silakan tunggu sekitar 2 menit sebelum mencoba menghubungkan kembali SSH / Web Monitor._`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📋 Lihat Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '📋 Cek Daftar & Status VPS', callback_data: 'cmd_list' }],
           [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
         ]
       }
     });
   } catch (err) {
-    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal restart VPS:* ${err.message}`, {
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]] }
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal restart VPS:*\n_${err.message}_`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `reboot_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
     });
   }
 }
