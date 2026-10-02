@@ -136,8 +136,8 @@ async function handleListProjects(bot, chatId, messageId) {
       buttons.push(row1);
 
       const row2 = [
-        { text: `⚡ Node.js`, callback_data: `vps_node_${p.id}` },
-        { text: `🧹 Reset AGY`, callback_data: `vps_agy_${p.id}` },
+        { text: `🛠️ Tools`, callback_data: `vps_tools_${p.id}` },
+        { text: `🤖 AI Agents`, callback_data: `vps_ai_${p.id}` },
         { text: `💿 Reinstall OS`, callback_data: `reinstall_${p.id}` }
       ];
       buttons.push(row2);
@@ -291,6 +291,61 @@ async function handleDeleteProject(bot, chatId, projectId) {
     });
   } catch (err) {
     safeSendMessage(bot, chatId, `❌ *Gagal menghapus project:* ${err.message}`);
+  }
+}
+
+async function handleShowToolsHub(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+  const currentNode = details?.nodeVersion || savedDep?.node_version || '20';
+  const nodeDisplay = currentNode === 'default' ? 'Default Distro' : `v${currentNode} LTS`;
+
+  const text = `🛠️ *PUSAT TOOLS & RUNTIME WORKSTATION*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⚡ *Node.js Runtime:* \`${nodeDisplay}\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Kelola runtime dan paket tools developer untuk VPS ini:\n\n` +
+    `• ⚡ *Ganti Versi Node.js* — Switch runtime v22 / v20 / v18 / Default secara permanen di cloud\n` +
+    `• 🎬 *Media & Downloader* — \`yt-dlp\`, \`ffmpeg\`, \`ffprobe\`, \`mediainfo\`\n` +
+    `• 📦 *Katalog 40+ Apps* — Lihat daftar lengkap software desktop & dev tools\n` +
+    `• 🌐 *Web Tool Installer* — Pasang software via Web Dashboard 1-Klik\n\n` +
+    `_Silakan pilih menu aksi:_`;
+
+  const inlineKeyboard = [
+    [{ text: `⚡ Ganti Versi Node.js (${nodeDisplay})`, callback_data: `vps_node_${projectId}` }],
+    [{ text: '📦 Lihat Katalog 40+ Apps & Software', callback_data: 'cmd_apps_catalog' }]
+  ];
+
+  if (details?.domain) {
+    inlineKeyboard.push([{ text: '🌐 Buka 1-Klik Web Tool Installer', url: details.domain }]);
+  }
+
+  inlineKeyboard.push([{ text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }]);
+
+  const keyboard = { inline_keyboard: inlineKeyboard };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
   }
 }
 
@@ -641,6 +696,7 @@ module.exports = {
   handleRestartProject,
   handleCheckBalance,
   handleDeleteProject,
+  handleShowToolsHub,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
   handleShowAiAgentsHub,

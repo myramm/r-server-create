@@ -45,6 +45,7 @@ const {
   handleRestartProject,
   handleCheckBalance,
   handleDeleteProject,
+  handleShowToolsHub,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
   handleShowAiAgentsHub,
@@ -254,6 +255,10 @@ bot.on('callback_query', async (query) => {
   }
 
   // VPS Action Callbacks
+  if (data.startsWith('vps_tools_')) {
+    const projectId = data.replace('vps_tools_', '');
+    return handleShowToolsHub(bot, chatId, messageId, projectId);
+  }
   if (data.startsWith('vps_node_')) {
     const projectId = data.replace('vps_node_', '');
     return handleShowChangeNodeMenu(bot, chatId, messageId, projectId);
