@@ -136,11 +136,16 @@ async function handleListProjects(bot, chatId, messageId) {
       buttons.push(row1);
 
       const row2 = [
-        { text: `⚡ Ganti Node.js`, callback_data: `vps_node_${p.id}` },
-        { text: `💿 Reinstall OS`, callback_data: `reinstall_${p.id}` },
-        { text: `🗑️ Hapus`, callback_data: `del_${p.id}` }
+        { text: `⚡ Node.js`, callback_data: `vps_node_${p.id}` },
+        { text: `🧹 Reset AGY`, callback_data: `vps_agy_${p.id}` },
+        { text: `💿 Reinstall OS`, callback_data: `reinstall_${p.id}` }
       ];
       buttons.push(row2);
+
+      const row3 = [
+        { text: `🗑️ Hapus VPS`, callback_data: `del_${p.id}` }
+      ];
+      buttons.push(row3);
     });
 
     buttons.push([
@@ -457,6 +462,141 @@ async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeV
   }
 }
 
+async function handleShowResetAgyMenu(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+
+  const text = `🧹 *RESET SESSION & HAPUS AKUN ANTIGRAVITY (AGY)*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `⚠️ *FUNGSI FITUR INI:*\n` +
+    `• Menghapus token Google Antigravity (\`ANTIGRAVITY_AUTH_TOKEN\`) dari Railway Cloud.\n` +
+    `• Mencegah akun lama Anda tertimpa kembali secara otomatis saat server di-restart.\n` +
+    `• Me-reboot container ke kondisi *100% Fresh State*, sehingga saat Anda mengetik \`agy\`, Anda bebas login ke akun Google baru tanpa ada akun yang nyangkut!\n\n` +
+    `❓ *Apakah Anda ingin mereset dan membersihkan session Antigravity sekarang?*`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🧹 Ya, Hapus Token Cloud & Reset AGY', callback_data: `do_agy_clean_${projectId}` }],
+      [{ text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }]
+    ]
+  };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function executeResetAgySession(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ [1/3] Menghubungi Railway API...`
+  );
+
+  try {
+    const details = await railway.getProjectDetails(token, projectId);
+    if (!details || !details.environmentId || !details.serviceId) {
+      throw new Error('Service atau Environment Railway tidak ditemukan.');
+    }
+
+    const { environmentId, serviceId } = details;
+    const fullIp = details.tcpIp || details.tcpHost || savedDep?.ssh_host || '-';
+    const fullPort = details.tcpPort || savedDep?.ssh_port || '22';
+    const targetDisplay = fullIp !== '-' ? `${fullIp}:${fullPort}` : (details.name || vpsName);
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY [${details.name || vpsName}]...*\n\n` +
+      `⏳ [2/3] Menghapus variable token Antigravity dari Railway Cloud...`
+    );
+
+    // Delete variables from Railway Cloud
+    await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_AUTH_TOKEN');
+    await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_TOKEN');
+
+    // Trigger redeploy / restart
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY [${details.name || vpsName}]...*\n\n` +
+      `⏳ [3/3] Me-restart container agar memori & session bersih 100%...`
+    );
+
+    await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
+
+    const successText = `✅ *SESI & TOKEN ANTIGRAVITY BERHASIL DI-RESET TOTAL!* 🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${targetDisplay}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `✨ *HASIL PEMBERSIHAN:*\n` +
+      `• Token lama di Cloud Railway telah **DIHAPUS BERSIH**.\n` +
+      `• Container sedang di-reboot (*Fresh State*).\n` +
+      `• Akun lama tidak akan pernah nyangkut atau login otomatis lagi.\n\n` +
+      `⏳ *MOHON TUNGGU 1 - 2 MENIT:*\n` +
+      `Setelah server online, login via SSH dan jalankan \`agy\` untuk login ke akun Google baru Anda dengan aman!`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📋 Cek Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal reset session Antigravity:*\n_${err.message}_`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `vps_agy_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  }
+}
+
 module.exports = {
   handleListProjects,
   handleRestartProject,
@@ -464,4 +604,6 @@ module.exports = {
   handleDeleteProject,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
+  handleShowResetAgyMenu,
+  executeResetAgySession,
 };

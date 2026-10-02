@@ -236,6 +236,30 @@ async function setVariable(token, projectId, environmentId, serviceId, name, val
 }
 
 /**
+ * Delete an Environment Variable for a Service
+ */
+async function deleteVariable(token, projectId, environmentId, serviceId, name) {
+  const query = `
+    mutation DeleteVar($input: VariableDeleteInput!) {
+      variableDelete(input: $input)
+    }
+  `;
+  try {
+    const data = await railwayGraphQL(token, query, {
+      input: {
+        projectId,
+        environmentId,
+        serviceId,
+        name,
+      }
+    });
+    return data?.variableDelete || false;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * Create TCP Proxy for Port 22 (SSH)
  */
 async function createTcpProxy(token, environmentId, serviceId, applicationPort = 22) {
@@ -720,6 +744,7 @@ module.exports = {
   createProject,
   createServiceFromRepo,
   setVariable,
+  deleteVariable,
   createTcpProxy,
   createServiceDomain,
   triggerRedeploy,

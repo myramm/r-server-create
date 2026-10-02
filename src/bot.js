@@ -47,6 +47,8 @@ const {
   handleDeleteProject,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
+  handleShowResetAgyMenu,
+  executeResetAgySession,
 } = require('./handlers/vpsHandler');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -262,6 +264,14 @@ bot.on('callback_query', async (query) => {
     const projectId = rest.substring(0, idx);
     const nodeVersion = rest.substring(idx + 1);
     return executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeVersion);
+  }
+  if (data.startsWith('vps_agy_')) {
+    const projectId = data.replace('vps_agy_', '');
+    return handleShowResetAgyMenu(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('do_agy_clean_')) {
+    const projectId = data.replace('do_agy_clean_', '');
+    return executeResetAgySession(bot, chatId, messageId, projectId);
   }
   if (data.startsWith('reboot_')) {
     const projectId = data.replace('reboot_', '');
