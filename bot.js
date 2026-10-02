@@ -1503,8 +1503,11 @@ async function handleReinstallOsMenu(chatId, messageId, projectId, page = 1) {
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `🐧 *OS Saat Ini:* *${currentOs}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `Pilih kategori distribusi Linux baru yang ingin Anda pasang pada VPS ini:\n` +
-    `_(Semua IP Address, Port SSH & Domain Web tetap sama)_\n`;
+    `⚠️ *PERINGATAN PENTING (DATA AKAN HILANG):*\n` +
+    `• *Reinstall OS akan MENGHAPUS SEMUA DATA & FILE di dalam VPS ini!* (Data lama hilang bersih / fresh install).\n` +
+    `• Pastikan Anda sudah mem-backup file atau script penting.\n` +
+    `• IP Address, Port SSH, Root Password & Web Dashboard *tetap sama & aman*.\n\n` +
+    `Pilih kategori distribusi Linux baru untuk VPS ini:`;
 
   const keyboard = {
     inline_keyboard: [
@@ -1540,7 +1543,7 @@ async function handleReinstallOsCategory(chatId, messageId, projectId, categoryK
   const text = `${cat.icon} *REINSTALL OS: PILIH RILIS ${cat.name.toUpperCase()}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
-    `ℹ️ _${cat.description}_\n` +
+    `⚠️ *PERINGATAN: Reinstall = SEMUA DATA LAMA AKAN HILANG / TERHAPUS!* \n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Pilih versi distro yang ingin diinstal ulang ke VPS ini:`;
 
@@ -1563,7 +1566,9 @@ function promptReinstallCustomOsInput(chatId, messageId, projectId) {
 
   const text = `🐳 *REINSTALL OS: INPUT CUSTOM DOCKER IMAGE*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🆔 *Target VPS:* \`${projectId}\`\n\n` +
+    `🆔 *Target VPS:* \`${projectId}\`\n` +
+    `⚠️ *PERINGATAN: Reinstall = SEMUA DATA VPS AKAN TERHAPUS BERSIH (HILANG)!*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Ketik nama Docker base image baru yang ingin Anda pasang di container VPS ini:\n\n` +
     `*Contoh:* \n` +
     `• \`debian:12\` atau \`debian:11\`\n` +
@@ -1607,24 +1612,24 @@ async function handleReinstallConfirm(chatId, messageId, projectId, distroCodeOr
   const sshHost = details?.tcpHost || savedDep?.ssh_host || 'altaria.proxy.rlwy.net';
   const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
 
-  const text = `⚠️ *KONFIRMASI REINSTALL SISTEM OPERASI (OS)*\n` +
+  const text = `🚨 *KONFIRMASI REINSTALL SISTEM OPERASI (OS)*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\` (\`${projectId}\`)\n` +
     `🐧 *OS Saat Ini:* \`${currentOs}\`\n` +
     `🚀 *OS Baru:* *${distro.name}* (\`${distro.id}\`)\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `📌 *Informasi Reinstall:* \n` +
-    `• Container VPS akan dibangun ulang (*redeploy*) dengan OS baru.\n` +
-    `• Host Domain (\`${sshHost}\`), Port SSH (\`${sshPort}\`), dan Web Dashboard **TETAP SAMA**.\n` +
-    `• Password root dan konfigurasi proxy tetap aman.\n` +
-    `• File data di root container lama akan di-reset bersih ke distro baru.\n\n` +
-    `❓ *Apakah Anda yakin ingin melakukan reinstall sekarang?*`;
+    `⚠️ *PERHATIAN: REINSTALL = SEMUA DATA LAMA AKAN HILANG!*\n` +
+    `• Semua file, script, tools & database di VPS ini akan **TERHAPUS BERSIH (HILANG TOTAL)**.\n` +
+    `• Container VPS akan dibangun ulang dari awal (*fresh state*) dengan OS baru.\n` +
+    `• Host Domain (\`${sshHost}\`), Port SSH (\`${sshPort}\`), dan Web Monitor **TETAP SAMA**.\n` +
+    `• Password root tetap aman.\n\n` +
+    `❓ *Apakah Anda yakin ingin menghapus data & melakukan reinstall sekarang?*`;
 
   const doCallback = distroCodeOrId === 'custom' ? `rdo_${projectId}_custom` : `rdo_${projectId}_${distro.code || distro.id}`;
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: `🚀 Ya, Reinstall ke ${distro.name.split(' ')[0]} Sekarang!`, callback_data: doCallback }],
+      [{ text: `🚀 Ya, Hapus Data & Reinstall Sekarang!`, callback_data: doCallback }],
       [{ text: '⬅️ Pilih OS Lain', callback_data: `rmenu_${projectId}` }],
       [{ text: '❌ Batalkan', callback_data: 'cmd_list' }]
     ]
