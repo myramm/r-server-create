@@ -1678,8 +1678,8 @@ async function executeReinstallOs(chatId, messageId, projectId, distroCodeOrId) 
     );
 
     // 1. Update Variables BASE_IMAGE & OS_NAME
-    await railway.setVariable(token, projectId, environmentId, serviceId, 'BASE_IMAGE', distro.id);
-    await railway.setVariable(token, projectId, environmentId, serviceId, 'OS_NAME', distro.name);
+    await railway.setVariable(token, projectId, environmentId, serviceId, 'BASE_IMAGE', distro.id, true);
+    await railway.setVariable(token, projectId, environmentId, serviceId, 'OS_NAME', distro.name, false);
 
     // 2. Update Project Description
     const newDesc = `${distro.name} SSH Server & Web Dashboard deployed via Telegram Bot`;
@@ -1699,9 +1699,9 @@ async function executeReinstallOs(chatId, messageId, projectId, distroCodeOrId) 
     // 4. Trigger Redeploy
     await railway.triggerRedeploy(token, environmentId, serviceId);
 
-    // 5. Polling until Redeploy is Ready / Running
+    // 5. Polling until Redeploy is Ready / Running (Up to 5 minutes)
     let attempts = 0;
-    const maxAttempts = 24; // ~2 minutes
+    const maxAttempts = 60; // 60 * 5s = 300s (5 minutes)
     let status = 'BUILDING';
 
     while (attempts < maxAttempts) {
@@ -1713,7 +1713,9 @@ async function executeReinstallOs(chatId, messageId, projectId, distroCodeOrId) 
         status = statusObj?.status || 'BUILDING';
 
         const elapsedSec = attempts * 5;
-        const timeStr = `${elapsedSec}s`;
+        const min = Math.floor(elapsedSec / 60);
+        const sec = elapsedSec % 60;
+        const timeStr = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
 
         if (attempts % 2 === 0 && status !== 'SUCCESS') {
           await safeEditMessage(
@@ -1722,7 +1724,7 @@ async function executeReinstallOs(chatId, messageId, projectId, distroCodeOrId) 
             `⏳ *MEMBANGUN ULANG CONTAINER (${distro.name})...*\n\n` +
             `🖥️ *VPS:* \`${vpsName}\`\n` +
             `📊 *Status Build:* \`${status}\` (${timeStr})\n\n` +
-            `🔄 _Sedang mendownload base image & mengaktifkan kembali OpenSSH..._`
+            `🔄 _Sedang mendownload base image, mengonfigurasi distro & mengaktifkan kembali OpenSSH..._`
           ).catch(() => {});
         }
 
@@ -1828,7 +1830,8 @@ async function handleCheckBalance(chatId) {
       `👤 *Nama:* ${user.name || 'User'}\n` +
       `📧 *Email:* \`${user.email}\`\n` +
       `💳 *Available Credits:* \`${credits}\`\n` +
-      `💵 *Current Balance:* \`${balance}\``;
+      `💵 *Current Balance:* \`${balance}\`\n\n` +
+      `💡 *Info Credit:* Akun Railway menyediakan kuota credit trial $5.00 yang akan me-refresh / reset secara berkala (setiap 24 jam) untuk menjalankan server VPS Anda secara hemat & gratis!`;
 
     const keyboard = {
       inline_keyboard: [

@@ -217,7 +217,7 @@ async function createServiceFromRepo(token, projectId, fullRepoName = 'myramm/r-
 /**
  * Set Environment Variables for a Service
  */
-async function setVariable(token, projectId, environmentId, serviceId, name, value) {
+async function setVariable(token, projectId, environmentId, serviceId, name, value, skipDeploys = false) {
   const query = `
     mutation SetVar($input: VariableUpsertInput!) {
       variableUpsert(input: $input)
@@ -230,7 +230,7 @@ async function setVariable(token, projectId, environmentId, serviceId, name, val
       serviceId,
       name,
       value,
-      skipDeploys: false,
+      skipDeploys: Boolean(skipDeploys),
     }
   });
 }
