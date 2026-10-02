@@ -51,6 +51,9 @@ const {
   handleShowPythonMenu,
   executeInstallPythonPack,
   handleShowAiAgentsHub,
+  handleShowAddAiAccountMenu,
+  handlePromptAiToken,
+  executeSetAiToken,
   executeResetAiAgent,
 } = require('./handlers/vpsHandler');
 
@@ -287,6 +290,17 @@ bot.on('callback_query', async (query) => {
     const projectId = data.replace('vps_ai_', '');
     return handleShowAiAgentsHub(bot, chatId, messageId, projectId);
   }
+  if (data.startsWith('ai_add_menu_')) {
+    const projectId = data.replace('ai_add_menu_', '');
+    return handleShowAddAiAccountMenu(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('ai_prompt_')) {
+    const rest = data.replace('ai_prompt_', '');
+    const idx = rest.indexOf('_');
+    const agentType = rest.substring(0, idx);
+    const projectId = rest.substring(idx + 1);
+    return handlePromptAiToken(bot, chatId, messageId, projectId, agentType);
+  }
   if (data.startsWith('ai_clean_')) {
     const rest = data.replace('ai_clean_', '');
     const idx = rest.indexOf('_');
@@ -366,6 +380,22 @@ bot.on('message', async (msg) => {
 
     const sentMsg = await safeSendMessage(bot, chatId, '✅ *Password root berhasil disetel!*');
     return showSummaryMenu(bot, chatId, sentMsg?.message_id);
+  }
+
+  // AI Agent Token / API Key Input
+  if (state.step === 'AWAIT_AI_TOKEN') {
+    const { targetProjectId, aiAgentType } = state.data;
+    if (!targetProjectId || !aiAgentType) {
+      state.step = 'IDLE';
+      db.saveSession(chatId, state);
+      return safeSendMessage(bot, chatId, '⚠️ *Sesi input token kedaluwarsa.* Silakan ulangi dari menu Hub AI.', {
+        reply_markup: { inline_keyboard: [[{ text: '📋 Daftar VPS', callback_data: 'cmd_list' }]] }
+      });
+    }
+
+    state.step = 'IDLE';
+    db.saveSession(chatId, state);
+    return executeSetAiToken(bot, chatId, targetProjectId, aiAgentType, text);
   }
 });
 

@@ -694,22 +694,26 @@ async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
   const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
   const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
 
-  const text = `🤖 *PUSAT KELOLA & RESET AI AGENTS*\n` +
+  const text = `🤖 *PUSAT KELOLA & AKUN AI AGENTS*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
     `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `Kelola session, hapus token cloud, dan ganti akun AI tanpa khawatir akun lama tersangkut kembali saat restart:\n\n` +
+    `Kelola akun, hubungkan token cloud, atau hapus session AI agent di VPS Anda:\n\n` +
     `• ⚡ *Google Antigravity CLI* (\`agy\` / \`ag\`)\n` +
     `• 🟣 *Claude Code CLI* (\`claude\` / \`cl\`)\n` +
     `• 🚀 *OpenCode AI* (\`opencode\` / \`oc\`)\n` +
     `• 🛡️ *Freebuff AI Assistant* (\`freebuff\` / \`fb\`)\n` +
-    `• 🐍 *Aider AI Assistant* (\`aider\`)\n\n` +
-    `_Pilih AI Agent di bawah ini untuk mereset session / menghapus token cloud:_`;
+    `• 🐍 *Aider AI Assistant* (\`aider\`)\n` +
+    `• 💎 *Gemini & DeepSeek APIs*\n\n` +
+    `_Pilih aksi kelola AI di bawah ini:_`;
 
   const keyboard = {
     inline_keyboard: [
+      [
+        { text: '➕ Tambah / Ganti Akun AI 🔑', callback_data: `ai_add_menu_${projectId}` }
+      ],
       [
         { text: '⚡ Reset Antigravity (AGY)', callback_data: `ai_clean_agy_${projectId}` },
         { text: '🟣 Reset Claude Code', callback_data: `ai_clean_claude_${projectId}` }
@@ -719,7 +723,7 @@ async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
         { text: '🛡️ Reset Freebuff & Aider', callback_data: `ai_clean_freebuff_${projectId}` }
       ],
       [
-        { text: '🧹 Reset SEMUA Token & Session AI (Fresh Total)', callback_data: `ai_clean_all_${projectId}` }
+        { text: '🧹 Reset SEMUA Token & Session (Fresh Total)', callback_data: `ai_clean_all_${projectId}` }
       ],
       [
         { text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }
@@ -731,6 +735,260 @@ async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
     return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
   } else {
     return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function handleShowAddAiAccountMenu(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+
+  const text = `➕ *TAMBAH / GANTI AKUN AI AGENT*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Pilih AI Agent yang ingin Anda hubungkan atau ganti akunnya:\n\n` +
+    `• ⚡ *Google Antigravity (AGY)* — OAuth Token / Gemini API Key\n` +
+    `• 🟣 *Claude Code CLI* — Anthropic Auth Token / API Key (\`sk-ant-...\`)\n` +
+    `• 🚀 *OpenCode AI* — OpenAI API Key (\`sk-...\`) / OpenCode Token\n` +
+    `• 💎 *Google Gemini API Key* — (\`AIzaSy...\`)\n` +
+    `• 🐋 *DeepSeek API Key* — (\`sk-...\`)\n` +
+    `• 🛡️ *Aider AI Assistant* — OpenAI / Anthropic / DeepSeek Key\n\n` +
+    `_Klik tombol AI Agent di bawah untuk memasukkan token/key:_`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '⚡ Antigravity (AGY)', callback_data: `ai_prompt_agy_${projectId}` },
+        { text: '🟣 Claude Code', callback_data: `ai_prompt_claude_${projectId}` }
+      ],
+      [
+        { text: '🚀 OpenCode AI', callback_data: `ai_prompt_opencode_${projectId}` },
+        { text: '💎 Gemini API Key', callback_data: `ai_prompt_gemini_${projectId}` }
+      ],
+      [
+        { text: '🐋 DeepSeek API Key', callback_data: `ai_prompt_deepseek_${projectId}` },
+        { text: '🛡️ Aider AI Key', callback_data: `ai_prompt_aider_${projectId}` }
+      ],
+      [
+        { text: '🔙 Kembali ke Hub AI', callback_data: `vps_ai_${projectId}` },
+        { text: '🏠 Menu Utama', callback_data: 'menu_main' }
+      ]
+    ]
+  };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function handlePromptAiToken(bot, chatId, messageId, projectId, agentType) {
+  const state = getUserState(chatId);
+  state.step = 'AWAIT_AI_TOKEN';
+  state.data.targetProjectId = projectId;
+  state.data.aiAgentType = agentType;
+  db.saveSession(chatId, state);
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = savedDep?.project_name || 'r-server';
+
+  const agentLabelMap = {
+    'agy': 'Google Antigravity (AGY)',
+    'claude': 'Claude Code CLI',
+    'opencode': 'OpenCode AI',
+    'gemini': 'Google Gemini API',
+    'deepseek': 'DeepSeek API',
+    'aider': 'Aider AI Assistant'
+  };
+  const label = agentLabelMap[agentType] || 'AI Agent';
+
+  const hintMap = {
+    'agy': 'OAuth Token dari antigravity-cli atau Gemini API Key (AIzaSy...)',
+    'claude': 'Anthropic Token atau API Key (sk-ant-api03-...)',
+    'opencode': 'OpenAI API Key (sk-proj-...) atau Token OpenCode',
+    'gemini': 'Gemini API Key dari Google AI Studio (AIzaSy...)',
+    'deepseek': 'DeepSeek API Key (sk-...)',
+    'aider': 'OpenAI / Anthropic / DeepSeek API Key'
+  };
+  const hint = hintMap[agentType] || 'Token / API Key';
+
+  const text = `🔑 *MASUKKAN TOKEN / KEY: [${label.toUpperCase()}]*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `ℹ️ *Format yang Diterima:* _${hint}_\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Silakan **ketik atau paste** string Token / API Key Anda di kolom chat Telegram ini:\n\n` +
+    `💡 _Token akan disimpan aman & dienkripsi di Cloud Railway Environment Variables._`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '❌ Batalkan', callback_data: `ai_add_menu_${projectId}` }]
+    ]
+  };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const agentLabelMap = {
+    'agy': 'Google Antigravity (AGY)',
+    'claude': 'Claude Code CLI',
+    'opencode': 'OpenCode AI',
+    'gemini': 'Google Gemini API',
+    'deepseek': 'DeepSeek API',
+    'aider': 'Aider AI Assistant'
+  };
+  const label = agentLabelMap[agentType] || 'AI Agent';
+
+  const cleanVal = tokenValue.trim();
+  const maskedVal = cleanVal.length > 8 
+    ? `${cleanVal.substring(0, 4)}...${cleanVal.substring(cleanVal.length - 4)}` 
+    : '****';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMASANG TOKEN [${label}]...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ [1/3] Menghubungi Railway Cloud API...`
+  );
+
+  try {
+    const details = await railway.getProjectDetails(token, projectId);
+    if (!details || !details.environmentId || !details.serviceId) {
+      throw new Error('Service atau Environment Railway tidak ditemukan.');
+    }
+
+    const { environmentId, serviceId } = details;
+    const fullIp = details.tcpIp || details.tcpHost || savedDep?.ssh_host || '-';
+    const fullPort = details.tcpPort || savedDep?.ssh_port || '22';
+    const targetDisplay = fullIp !== '-' ? `${fullIp}:${fullPort}` : (details.name || vpsName);
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMASANG TOKEN [${label}]...*\n\n` +
+      `⏳ [2/3] Menyimpan token ke Railway Cloud Environment Variables...`
+    );
+
+    if (agentType === 'agy') {
+      if (cleanVal.startsWith('AIzaSy')) {
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'GEMINI_API_KEY', cleanVal, true);
+      } else {
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_AUTH_TOKEN', cleanVal, true);
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_TOKEN', cleanVal, true);
+      }
+    } else if (agentType === 'claude') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'ANTHROPIC_AUTH_TOKEN', cleanVal, true);
+      if (cleanVal.startsWith('sk-ant')) {
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'ANTHROPIC_API_KEY', cleanVal, true);
+      }
+    } else if (agentType === 'opencode') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENCODE_TOKEN', cleanVal, true);
+      if (cleanVal.startsWith('sk-')) {
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENAI_API_KEY', cleanVal, true);
+      }
+    } else if (agentType === 'gemini') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'GEMINI_API_KEY', cleanVal, true);
+    } else if (agentType === 'deepseek') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'DEEPSEEK_API_KEY', cleanVal, true);
+    } else if (agentType === 'aider') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'AIDER_API_KEY', cleanVal, true);
+      if (cleanVal.startsWith('sk-')) {
+        await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENAI_API_KEY', cleanVal, true);
+      }
+    }
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMASANG TOKEN [${label}]...*\n\n` +
+      `⏳ [3/3] Me-restart container agar akun langsung aktif...`
+    );
+
+    await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
+
+    const cmdHintMap = {
+      'agy': 'agy (atau ag)',
+      'claude': 'claude (atau cl)',
+      'opencode': 'opencode (atau oc)',
+      'gemini': 'agy',
+      'deepseek': 'aider --model deepseek/...',
+      'aider': 'aider (atau ai)'
+    };
+    const cmdHint = cmdHintMap[agentType] || 'ai';
+
+    const successText = `✅ *AKUN [${label}] BERHASIL DIHUBUNGKAN!* 🔑🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${targetDisplay}\`\n` +
+      `🔑 *Token:* \`${maskedVal}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `✨ *STATUS AKUN AI:*\n` +
+      `• Token telah disimpan secara **permanen** di Cloud Railway.\n` +
+      `• Container sedang me-restart (1–2 menit) untuk menerapkan kredensial baru.\n` +
+      `• Akun akan otomatis terhubung setiap kali server dinyalakan.\n\n` +
+      `💡 *Cara Penggunaan di Terminal SSH:*\n` +
+      `Jalankan \`${cmdHint}\` setelah server kembali online untuk langsung mulai coding!`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📋 Cek Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal memasang token AI:*\n_${err.message}_`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `ai_add_menu_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
   }
 }
 
@@ -860,5 +1118,8 @@ module.exports = {
   handleShowPythonMenu,
   executeInstallPythonPack,
   handleShowAiAgentsHub,
+  handleShowAddAiAccountMenu,
+  handlePromptAiToken,
+  executeSetAiToken,
   executeResetAiAgent,
 };
