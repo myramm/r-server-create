@@ -47,8 +47,8 @@ const {
   handleDeleteProject,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
-  handleShowResetAgyMenu,
-  executeResetAgySession,
+  handleShowAiAgentsHub,
+  executeResetAiAgent,
 } = require('./handlers/vpsHandler');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -265,13 +265,16 @@ bot.on('callback_query', async (query) => {
     const nodeVersion = rest.substring(idx + 1);
     return executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeVersion);
   }
-  if (data.startsWith('vps_agy_')) {
-    const projectId = data.replace('vps_agy_', '');
-    return handleShowResetAgyMenu(bot, chatId, messageId, projectId);
+  if (data.startsWith('vps_ai_')) {
+    const projectId = data.replace('vps_ai_', '');
+    return handleShowAiAgentsHub(bot, chatId, messageId, projectId);
   }
-  if (data.startsWith('do_agy_clean_')) {
-    const projectId = data.replace('do_agy_clean_', '');
-    return executeResetAgySession(bot, chatId, messageId, projectId);
+  if (data.startsWith('ai_clean_')) {
+    const rest = data.replace('ai_clean_', '');
+    const idx = rest.indexOf('_');
+    const agentType = rest.substring(0, idx);
+    const projectId = rest.substring(idx + 1);
+    return executeResetAiAgent(bot, chatId, messageId, projectId, agentType);
   }
   if (data.startsWith('reboot_')) {
     const projectId = data.replace('reboot_', '');

@@ -462,7 +462,7 @@ async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeV
   }
 }
 
-async function handleShowResetAgyMenu(bot, chatId, messageId, projectId) {
+async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
   const state = getUserState(chatId);
   const sysToken = db.getSystemRailwayToken();
   const token = state.data?.railwayToken || sysToken;
@@ -481,22 +481,36 @@ async function handleShowResetAgyMenu(bot, chatId, messageId, projectId) {
   const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
   const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
 
-  const text = `🧹 *RESET SESSION & HAPUS AKUN ANTIGRAVITY (AGY)*\n` +
+  const text = `🤖 *PUSAT KELOLA & RESET AI AGENTS*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
     `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `⚠️ *FUNGSI FITUR INI:*\n` +
-    `• Menghapus token Google Antigravity (\`ANTIGRAVITY_AUTH_TOKEN\`) dari Railway Cloud.\n` +
-    `• Mencegah akun lama Anda tertimpa kembali secara otomatis saat server di-restart.\n` +
-    `• Me-reboot container ke kondisi *100% Fresh State*, sehingga saat Anda mengetik \`agy\`, Anda bebas login ke akun Google baru tanpa ada akun yang nyangkut!\n\n` +
-    `❓ *Apakah Anda ingin mereset dan membersihkan session Antigravity sekarang?*`;
+    `Kelola session, hapus token cloud, dan ganti akun AI tanpa khawatir akun lama tersangkut kembali saat restart:\n\n` +
+    `• ⚡ *Google Antigravity CLI* (\`agy\` / \`ag\`)\n` +
+    `• 🟣 *Claude Code CLI* (\`claude\` / \`cl\`)\n` +
+    `• 🚀 *OpenCode AI* (\`opencode\` / \`oc\`)\n` +
+    `• 🛡️ *Freebuff AI Assistant* (\`freebuff\` / \`fb\`)\n` +
+    `• 🐍 *Aider AI Assistant* (\`aider\`)\n\n` +
+    `_Pilih AI Agent di bawah ini untuk mereset session / menghapus token cloud:_`;
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '🧹 Ya, Hapus Token Cloud & Reset AGY', callback_data: `do_agy_clean_${projectId}` }],
-      [{ text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }]
+      [
+        { text: '⚡ Reset Antigravity (AGY)', callback_data: `ai_clean_agy_${projectId}` },
+        { text: '🟣 Reset Claude Code', callback_data: `ai_clean_claude_${projectId}` }
+      ],
+      [
+        { text: '🚀 Reset OpenCode AI', callback_data: `ai_clean_opencode_${projectId}` },
+        { text: '🛡️ Reset Freebuff & Aider', callback_data: `ai_clean_freebuff_${projectId}` }
+      ],
+      [
+        { text: '🧹 Reset SEMUA Token & Session AI (Fresh Total)', callback_data: `ai_clean_all_${projectId}` }
+      ],
+      [
+        { text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }
+      ]
     ]
   };
 
@@ -507,7 +521,7 @@ async function handleShowResetAgyMenu(bot, chatId, messageId, projectId) {
   }
 }
 
-async function executeResetAgySession(bot, chatId, messageId, projectId) {
+async function executeResetAiAgent(bot, chatId, messageId, projectId, agentType) {
   const state = getUserState(chatId);
   const sysToken = db.getSystemRailwayToken();
   const token = state.data?.railwayToken || sysToken;
@@ -521,13 +535,22 @@ async function executeResetAgySession(bot, chatId, messageId, projectId) {
   const savedDep = db.getDeploymentByProjectId(projectId);
   const vpsName = savedDep?.project_name || 'r-server';
 
+  const agentLabelMap = {
+    'agy': 'Google Antigravity CLI',
+    'claude': 'Claude Code CLI',
+    'opencode': 'OpenCode AI',
+    'freebuff': 'Freebuff & Aider AI',
+    'all': 'SEMUA AI AGENTS (Total Clean)'
+  };
+  const label = agentLabelMap[agentType] || 'AI Agent';
+
   const loadMsg = await safeSendMessage(
     bot,
     chatId,
-    `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY...*\n\n` +
+    `⏳ *MEMPROSES RESET SESSION [${label}]...*\n\n` +
     `🖥️ *Target VPS:* \`${vpsName}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
-    `⏳ [1/3] Menghubungi Railway API...`
+    `⏳ [1/3] Menghubungi Railway Cloud API...`
   );
 
   try {
@@ -545,51 +568,67 @@ async function executeResetAgySession(bot, chatId, messageId, projectId) {
       bot,
       chatId,
       loadMsg.message_id,
-      `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY [${details.name || vpsName}]...*\n\n` +
-      `⏳ [2/3] Menghapus variable token Antigravity dari Railway Cloud...`
+      `⏳ *MEMPROSES RESET SESSION [${label}]...*\n\n` +
+      `⏳ [2/3] Menghapus token & variable terkait dari Railway Cloud...`
     );
 
-    // Delete variables from Railway Cloud
-    await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_AUTH_TOKEN');
-    await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_TOKEN');
+    // Delete appropriate variables depending on agentType
+    if (agentType === 'agy' || agentType === 'all') {
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_AUTH_TOKEN');
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTIGRAVITY_TOKEN');
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'GEMINI_API_KEY');
+    }
+    if (agentType === 'claude' || agentType === 'all') {
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'CLAUDE_CODE_TOKEN');
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'CLAUDE_API_KEY');
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'ANTHROPIC_API_KEY');
+    }
+    if (agentType === 'opencode' || agentType === 'all') {
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'OPENCODE_TOKEN');
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'OPENAI_API_KEY');
+    }
+    if (agentType === 'freebuff' || agentType === 'all') {
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'AIDER_API_KEY');
+    }
 
     // Trigger redeploy / restart
     await safeEditMessage(
       bot,
       chatId,
       loadMsg.message_id,
-      `⏳ *MEMPROSES RESET SESSION ANTIGRAVITY [${details.name || vpsName}]...*\n\n` +
+      `⏳ *MEMPROSES RESET SESSION [${label}]...*\n\n` +
       `⏳ [3/3] Me-restart container agar memori & session bersih 100%...`
     );
 
     await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
 
-    const successText = `✅ *SESI & TOKEN ANTIGRAVITY BERHASIL DI-RESET TOTAL!* 🎉\n` +
+    const successText = `✅ *SESI & TOKEN [${label}] BERHASIL DIBERSIHKAN!* 🎉\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
       `🌐 *IP Address:* \`${targetDisplay}\`\n` +
       `🆔 *Project ID:* \`${projectId}\`\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
       `✨ *HASIL PEMBERSIHAN:*\n` +
-      `• Token lama di Cloud Railway telah **DIHAPUS BERSIH**.\n` +
-      `• Container sedang di-reboot (*Fresh State*).\n` +
-      `• Akun lama tidak akan pernah nyangkut atau login otomatis lagi.\n\n` +
-      `⏳ *MOHON TUNGGU 1 - 2 MENIT:*\n` +
-      `Setelah server online, login via SSH dan jalankan \`agy\` untuk login ke akun Google baru Anda dengan aman!`;
+      `• Token & session *${label}* di Cloud Railway telah **DIHAPUS BERSIH**.\n` +
+      `• Container sedang me-restart ke kondisi *100% Fresh State*.\n` +
+      `• Akun lama tidak akan pernah nyangkut atau auto-login lagi saat reboot.\n\n` +
+      `⏳ *MOHON TUNGGU SEKITAR 1 - 2 MENIT:*\n` +
+      `Setelah server kembali online, Anda bebas login atau setup akun baru dengan aman!`;
 
     safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
       reply_markup: {
         inline_keyboard: [
           [{ text: '📋 Cek Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '🤖 Kelola AI Agents Lain', callback_data: `vps_ai_${projectId}` }],
           [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
         ]
       }
     });
   } catch (err) {
-    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal reset session Antigravity:*\n_${err.message}_`, {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal reset session AI:*\n_${err.message}_`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔄 Coba Lagi', callback_data: `vps_agy_${projectId}` }],
+          [{ text: '🔄 Coba Lagi', callback_data: `vps_ai_${projectId}` }],
           [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
         ]
       }
@@ -604,6 +643,6 @@ module.exports = {
   handleDeleteProject,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
-  handleShowResetAgyMenu,
-  executeResetAgySession,
+  handleShowAiAgentsHub,
+  executeResetAiAgent,
 };
