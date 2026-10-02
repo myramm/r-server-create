@@ -321,16 +321,21 @@ async function handleShowToolsHub(bot, chatId, messageId, projectId) {
     `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `⚡ *Node.js Runtime:* \`${nodeDisplay}\`\n` +
+    `🐍 *Python Environment:* \`Python 3 + Astral UV\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Kelola runtime dan paket tools developer untuk VPS ini:\n\n` +
     `• ⚡ *Ganti Versi Node.js* — Switch runtime v22 / v20 / v18 / Default secara permanen di cloud\n` +
+    `• 🐍 *Python Dev & Astral UV* — Pasang / update pip, venv, Astral uv, build-tools & AI libs\n` +
     `• 🎬 *Media & Downloader* — \`yt-dlp\`, \`ffmpeg\`, \`ffprobe\`, \`mediainfo\`\n` +
     `• 📦 *Katalog 40+ Apps* — Lihat daftar lengkap software desktop & dev tools\n` +
     `• 🌐 *Web Tool Installer* — Pasang software via Web Dashboard 1-Klik\n\n` +
     `_Silakan pilih menu aksi:_`;
 
   const inlineKeyboard = [
-    [{ text: `⚡ Ganti Versi Node.js (${nodeDisplay})`, callback_data: `vps_node_${projectId}` }],
+    [
+      { text: `⚡ Ganti Versi Node.js (${nodeDisplay})`, callback_data: `vps_node_${projectId}` },
+      { text: `🐍 Python Dev & Astral UV`, callback_data: `vps_python_${projectId}` }
+    ],
     [{ text: '📦 Lihat Katalog 40+ Apps & Software', callback_data: 'cmd_apps_catalog' }]
   ];
 
@@ -510,6 +515,159 @@ async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeV
       reply_markup: {
         inline_keyboard: [
           [{ text: '🔄 Coba Lagi', callback_data: `vps_node_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  }
+}
+
+async function handleShowPythonMenu(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  let loadMsg;
+  if (messageId) {
+    await safeEditMessage(bot, chatId, messageId, '⏳ *Memuat data konfigurasi Python VPS...*');
+    loadMsg = { message_id: messageId };
+  } else {
+    loadMsg = await safeSendMessage(bot, chatId, '⏳ *Memuat data konfigurasi Python VPS...*');
+  }
+
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+
+  const text = `🐍 *KELOLA PYTHON & ASTRAL UV RUNTIME*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `🐍 *Python Version:* \`Python 3.x (Active)\`\n` +
+    `⚡ *Package Manager:* \`Astral UV & PIP\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Ekosistem Python Dev siap pakai untuk VPS Anda:\n\n` +
+    `• ⚡ *Astral UV* — Package manager tercepat (10-100x lebih cepat dari pip)\n` +
+    `• 📦 *Python Virtualenv & Pip* (\`python3-pip\`, \`python3-venv\`, \`python3-dev\`)\n` +
+    `• 🛠️ *C/C++ Build Essentials* (\`gcc\`, \`g++\`, \`make\`, \`cmake\`) untuk compile native wheel\n` +
+    `• 🤖 *AI & Data Science Suite* (\`ipython\`, \`rich\`, \`typer\`, \`aider-chat\`, \`hermes-agent\`)\n\n` +
+    `💡 *Perintah Populer di Terminal VPS:*\n` +
+    `• \`uv pip install <paket>\` (Instalasi super cepat)\n` +
+    `• \`uv venv\` (Buat virtualenv instan)\n` +
+    `• \`python --version\` & \`pip --version\`\n\n` +
+    `_Pilih opsi di bawah untuk memperbarui / memasang paket Python di Cloud Railway:_`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🚀 Pasang / Update Python Dev & Astral UV', callback_data: `py_pack_dev_${projectId}` }],
+      [{ text: '🤖 Pasang AI & Data Science Suite', callback_data: `py_pack_ai_${projectId}` }],
+      [{ text: '🔙 Kembali ke Menu Tools', callback_data: `vps_tools_${projectId}` }],
+      [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+    ]
+  };
+
+  return safeEditMessage(bot, chatId, loadMsg.message_id, text, { reply_markup: keyboard });
+}
+
+async function executeInstallPythonPack(bot, chatId, messageId, projectId, packType) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+  const packLabel = packType === 'ai' ? 'Python AI & Data Suite' : 'Python Dev & Astral UV';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMASANG PAKET [${packLabel}]...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ [1/3] Mengonfigurasi Railway Cloud Variables...`
+  );
+
+  try {
+    const details = await railway.getProjectDetails(token, projectId);
+    if (!details || !details.environmentId || !details.serviceId) {
+      throw new Error('Service atau Environment Railway tidak ditemukan.');
+    }
+
+    const { environmentId, serviceId } = details;
+    const fullIp = details.tcpIp || details.tcpHost || savedDep?.ssh_host || '-';
+    const fullPort = details.tcpPort || savedDep?.ssh_port || '22';
+    const targetDisplay = fullIp !== '-' ? `${fullIp}:${fullPort}` : (details.name || vpsName);
+
+    let extraPacks = 'python3-pip python3-dev python3-venv build-essential';
+    if (packType === 'ai') {
+      extraPacks += ' python3-numpy python3-scipy';
+    }
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMASANG PAKET [${packLabel}]...*\n\n` +
+      `⏳ [2/3] Menyimpan environment variable EXTRA_PACKAGES di Cloud...`
+    );
+
+    await railway.setVariable(token, projectId, environmentId, serviceId, 'EXTRA_PACKAGES', extraPacks, true);
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMASANG PAKET [${packLabel}]...*\n\n` +
+      `⏳ [3/3] Me-restart container agar paket aktif sempurna...`
+    );
+
+    await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
+
+    const successText = `✅ *PAKET [${packLabel}] BERHASIL DIKONFIGURASI!* 🐍🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${targetDisplay}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `✨ *PAKET YANG TERPASANG:*\n` +
+      `• 🐍 \`python3\`, \`pip3\`, \`python3-dev\`, \`venv\`\n` +
+      `• ⚡ Astral \`uv\` (Blazing-fast package installer)\n` +
+      `• 🛠️ \`build-essential\`, \`gcc\`, \`make\`, \`cmake\`\n` +
+      `${packType === 'ai' ? '• 🤖 AI & Data Tools: `ipython`, `rich`, `aider-chat`, `hermes-agent`\n' : ''}\n` +
+      `⏳ *MOHON TUNGGU SEKITAR 1 - 2 MENIT:*\n` +
+      `Server sedang me-reboot untuk memuat seluruh runtime. Setelah itu Anda dapat langsung menjalankan \`uv pip install\` atau \`python3\` di terminal SSH!`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📋 Cek Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '🛠️ Menu Tools Hub', callback_data: `vps_tools_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal memasang paket Python:*\n_${err.message}_`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `vps_python_${projectId}` }],
           [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
         ]
       }
@@ -699,6 +857,8 @@ module.exports = {
   handleShowToolsHub,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
+  handleShowPythonMenu,
+  executeInstallPythonPack,
   handleShowAiAgentsHub,
   executeResetAiAgent,
 };

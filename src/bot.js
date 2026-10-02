@@ -48,6 +48,8 @@ const {
   handleShowToolsHub,
   handleShowChangeNodeMenu,
   executeChangeNodeVersion,
+  handleShowPythonMenu,
+  executeInstallPythonPack,
   handleShowAiAgentsHub,
   executeResetAiAgent,
 } = require('./handlers/vpsHandler');
@@ -269,6 +271,17 @@ bot.on('callback_query', async (query) => {
     const projectId = rest.substring(0, idx);
     const nodeVersion = rest.substring(idx + 1);
     return executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeVersion);
+  }
+  if (data.startsWith('vps_python_')) {
+    const projectId = data.replace('vps_python_', '');
+    return handleShowPythonMenu(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('py_pack_')) {
+    const rest = data.replace('py_pack_', '');
+    const idx = rest.indexOf('_');
+    const packType = rest.substring(0, idx);
+    const projectId = rest.substring(idx + 1);
+    return executeInstallPythonPack(bot, chatId, messageId, projectId, packType);
   }
   if (data.startsWith('vps_ai_')) {
     const projectId = data.replace('vps_ai_', '');
