@@ -25,17 +25,22 @@ async function handleReinstallOsMenu(bot, chatId, messageId, projectId) {
   const savedDep = db.getDeploymentByProjectId(projectId);
   const projectName = details?.name || savedDep?.project_name || 'r-server';
   const currentOs = details?.osName || savedDep?.os_name || 'Debian 12 (Bookworm)';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
 
   const text = `💿 *REINSTALL / GANTI SISTEM OPERASI (OS)*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `🐧 *OS Saat Ini:* *${currentOs}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `⚠️ *PERINGATAN PENTING (DATA AKAN HILANG):*\n` +
     `• *Reinstall OS akan MENGHAPUS SEMUA DATA & FILE di dalam VPS ini!* (Data lama hilang bersih / fresh install).\n` +
     `• Pastikan Anda sudah mem-backup file atau script penting.\n` +
-    `• IP Address, Port SSH, Root Password & Web Dashboard *tetap sama & aman*.\n\n` +
+    `• IP Address (\`${sshIp}\`), Port SSH (\`${sshPort}\`), Root Password & Web Dashboard *tetap sama & aman*.\n\n` +
     `Pilih kategori distribusi Linux baru untuk VPS ini:`;
 
   const keyboard = {
@@ -67,11 +72,17 @@ async function handleReinstallOsCategory(bot, chatId, messageId, projectId, cate
   const state = getUserState(chatId);
   const token = state.data?.railwayToken || db.getSystemRailwayToken();
   const details = await railway.getProjectDetails(token, projectId).catch(() => null);
-  const projectName = details?.name || 'r-server';
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
 
   const text = `${cat.icon} *REINSTALL OS: PILIH RILIS ${cat.name.toUpperCase()}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `⚠️ *PERINGATAN: Reinstall = SEMUA DATA LAMA AKAN HILANG / TERHAPUS!* \n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Pilih versi distro yang ingin diinstal ulang ke VPS ini:`;
@@ -87,15 +98,25 @@ async function handleReinstallOsCategory(bot, chatId, messageId, projectId, cate
   safeEditMessage(bot, chatId, messageId, text, { reply_markup: { inline_keyboard: buttons } });
 }
 
-function promptReinstallCustomOsInput(bot, chatId, messageId, projectId) {
+async function promptReinstallCustomOsInput(bot, chatId, messageId, projectId) {
   const state = getUserState(chatId);
   state.step = 'AWAIT_REINSTALL_CUSTOM_OS';
   state.data.reinstallProjectId = projectId;
   db.saveSession(chatId, state);
 
+  const token = state.data?.railwayToken || db.getSystemRailwayToken();
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+
   const text = `🐳 *REINSTALL OS: INPUT CUSTOM DOCKER IMAGE*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🆔 *Target VPS:* \`${projectId}\`\n` +
+    `🖥️ *Target VPS:* \`${projectName}\` (\`${ipDisplay}\`)\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
     `⚠️ *PERINGATAN: Reinstall = SEMUA DATA VPS AKAN TERHAPUS BERSIH (HILANG)!*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Ketik nama Docker base image baru yang ingin Anda pasang di container VPS ini:\n\n` +
@@ -139,18 +160,22 @@ async function handleReinstallConfirm(bot, chatId, messageId, projectId, distroC
   const projectName = details?.name || savedDep?.project_name || 'r-server';
   const currentOs = details?.osName || savedDep?.os_name || 'Debian 12 (Bookworm)';
   const sshHost = details?.tcpHost || savedDep?.ssh_host || 'altaria.proxy.rlwy.net';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
   const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
 
   const text = `🚨 *KONFIRMASI REINSTALL SISTEM OPERASI (OS)*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🖥️ *Target VPS:* \`${projectName}\` (\`${projectId}\`)\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
     `🐧 *OS Saat Ini:* \`${currentOs}\`\n` +
     `🚀 *OS Baru:* *${distro.name}* (\`${distro.id}\`)\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `⚠️ *PERHATIAN: REINSTALL = SEMUA DATA LAMA AKAN HILANG!*\n` +
     `• Semua file, script, tools & database di VPS ini akan **TERHAPUS BERSIH (HILANG TOTAL)**.\n` +
     `• Container VPS akan dibangun ulang dari awal (*fresh state*) dengan OS baru.\n` +
-    `• Host Domain (\`${sshHost}\`), Port SSH (\`${sshPort}\`), dan Web Monitor **TETAP SAMA**.\n` +
+    `• IP Address (\`${sshIp}\`), Port SSH (\`${sshPort}\`), dan Web Monitor **TETAP SAMA**.\n` +
     `• Password root tetap aman.\n\n` +
     `❓ *Apakah Anda yakin ingin menghapus data & melakukan reinstall sekarang?*`;
 
@@ -181,11 +206,20 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
     }
   }
 
+  const preDetails = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const sshHostPre = preDetails?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIpPre = preDetails?.tcpIp || savedDep?.ssh_host || sshHostPre;
+  const sshPortPre = preDetails?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplayPre = sshIpPre !== '-' ? `${sshIpPre}:${sshPortPre}` : '-';
+  const vpsNamePre = preDetails?.name || savedDep?.project_name || 'r-server';
+
   const loadMsg = await safeSendMessage(
     bot,
     chatId,
     `⏳ *MEMULAI PROSES REINSTALL OS...*\n\n` +
-    `🖥️ *Target VPS:* \`${projectId}\`\n` +
+    `🖥️ *Target VPS:* \`${vpsNamePre}\` (\`${ipDisplayPre}\`)\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
     `🐧 *OS Baru:* *${distro.name}* (\`${distro.id}\`)\n` +
     `⏳ [1/4] Mengambil konfigurasi project Railway...`
   );
@@ -203,7 +237,7 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
       bot,
       chatId,
       loadMsg.message_id,
-      `⏳ *MEMPROSES REINSTALL OS [${vpsName}]...*\n\n` +
+      `⏳ *MEMPROSES REINSTALL OS [${vpsName}] (${ipDisplayPre})...*\n\n` +
       `🐧 *OS Baru:* *${distro.name}*\n` +
       `⏳ [2/4] Mengatur environment variables OS (\`BASE_IMAGE=${distro.id}\`)...`
     );
@@ -223,7 +257,7 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
       bot,
       chatId,
       loadMsg.message_id,
-      `⏳ *MEMPROSES REINSTALL OS [${vpsName}]...*\n\n` +
+      `⏳ *MEMPROSES REINSTALL OS [${vpsName}] (${ipDisplayPre})...*\n\n` +
       `🐧 *OS Baru:* *${distro.name}*\n` +
       `⏳ [3/4] Memicu Redeploy container baru di Railway Cloud...`
     );
@@ -255,7 +289,7 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
             chatId,
             loadMsg.message_id,
             `⏳ *MEMBANGUN ULANG CONTAINER (${distro.name})...*\n\n` +
-            `🖥️ *VPS:* \`${vpsName}\`\n` +
+            `🖥️ *VPS:* \`${vpsName}\` (\`${ipDisplayPre}\`)\n` +
             `📊 *Status Build:* \`${status}\` (${timeStr})\n\n` +
             `🔄 _Sedang mendownload base image, mengonfigurasi distro & mengaktifkan kembali OpenSSH..._`
           );
