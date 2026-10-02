@@ -206,9 +206,9 @@ async function promptTokenInput(bot, chatId, messageId) {
         `👉 *Cara 1 (Rekomendasi - Sekali Klik):*\n` +
         `Klik tombol **'🚀 Sign in with 1-Click'** di bawah untuk langsung menyetujui di browser.\n\n` +
         `👉 *Cara 2 (Input Kode Manual):*\n` +
-        `1. Buka browser: [railway.com/activate](https://railway.com/activate)\n` +
+        `1. Buka browser: railway.com/activate\n` +
         `2. Masukkan kode verifikasi:\n` +
-        `🔑 \`${userCode}\`\n\n` +
+        `🔑 https://railway.com/activate?user\\_code=${userCode}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `⏳ _Menunggu konfirmasi login dari browser Anda (otomatis terdeteksi)..._`;
 
