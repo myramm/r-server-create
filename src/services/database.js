@@ -1,7 +1,23 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
-const DB_PATH = path.join(__dirname, 'bot.sqlite');
+const DATA_DIR = path.join(__dirname, '../../data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Check for legacy root bot.sqlite and migrate if data/bot.sqlite doesn't exist
+const LEGACY_DB_PATH = path.join(__dirname, '../../bot.sqlite');
+const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'bot.sqlite');
+
+if (!fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+  try {
+    fs.copyFileSync(LEGACY_DB_PATH, DB_PATH);
+  } catch (e) {}
+}
+
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for high performance & reliability
@@ -102,9 +118,6 @@ function saveUser(chatId, data = {}) {
 /**
  * Read active token from ~/.railway/config.json if available on server
  */
-const fs = require('fs');
-const os = require('os');
-
 function getSystemRailwayToken() {
   try {
     const configPath = path.join(os.homedir(), '.railway', 'config.json');
@@ -237,7 +250,6 @@ function saveSession(chatId, session) {
  * Reset Wizard creation data while preserving saved Railway Token
  */
 function resetSession(chatId) {
-  const user = getUser(chatId);
   const defaultAi = { claude: true, agy: true, aider: false };
   const defaultTools = { xrdp: true, ffmpeg: true, ytdlp: true, fastfetch: true, nginx: false, redis: false, python_dev: true };
   
