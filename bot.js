@@ -80,8 +80,8 @@ function sendMainMenu(chatId, name = 'User') {
 
   const text = `👋 *Halo ${name}!*\n\n` +
     `🤖 *R-SERVER Cloud VPS Generator Bot*\n` +
-    `Bot untuk membuat & mengelola server Cloud VPS (*Debian* & *Arch Linux*) di Railway secara otomatis dengan konfigurasi custom:\n\n` +
-    `• 🐧 *Sistem Operasi:* Debian 12/11 & Arch Linux (Rolling)\n` +
+    `Bot untuk membuat & mengelola server Cloud VPS (*Debian, Arch, Ubuntu, Kali Linux*) di Railway secara otomatis dengan konfigurasi custom:\n\n` +
+    `• 🐧 *Sistem Operasi:* Debian, Arch Linux, Ubuntu & Kali Linux\n` +
     `• ⚡ *Node.js Version:* v22 LTS / v20 LTS / v18 LTS / Default\n` +
     `• 🤖 *AI Coding Agent:* Claude Code & Google Antigravity CLI\n` +
     `• 🖥️ *Remote Desktop:* XRDP + XFCE4 GUI (Port 3389)\n` +
@@ -102,7 +102,7 @@ function sendMainMenu(chatId, name = 'User') {
         { text: '🔑 Login Railway (1-Klik)', callback_data: 'cmd_set_token' }
       ],
       [
-        { text: '📚 Pilihan OS (Debian & Arch)', callback_data: 'cmd_catalog' },
+        { text: '📚 Katalog OS (4 Distro Family)', callback_data: 'cmd_catalog' },
         { text: '📦 Katalog 40+ Apps XRDP', callback_data: 'cmd_apps_catalog' }
       ]
     ]
@@ -600,28 +600,28 @@ function promptManualTokenInput(chatId, messageId) {
   }
 }
 
-// Step 2: OS Menu (Debian & Arch Linux)
+// Step 2: Categorized OS Menu (Debian, Arch, Ubuntu, Kali)
 function showOsMenu(chatId, messageId) {
-  const text = `🐧 *Langkah 2/5: Pilih Sistem Operasi (OS)*\n\n` +
-    `Pilih sistem operasi Linux yang ingin Anda gunakan untuk VPS Railway:\n\n` +
-    `• *Debian GNU/Linux* (APT) — Rock-solid, stabil, ringan, dan aman.\n` +
-    `• *Arch Linux* (Pacman) — Bleeding-edge rolling release, paket software terbaru.\n\n` +
-    `_Klik tombol di bawah untuk memilih:_`;
-
-  const debian12 = OS_CATALOG.debian?.distros?.find(d => d.id === 'debian:12') || { code: 'os_1' };
-  const debian11 = OS_CATALOG.debian?.distros?.find(d => d.id === 'debian:11') || { code: 'os_2' };
-  const arch = OS_CATALOG.arch?.distros?.find(d => d.id === 'archlinux:latest') || { code: 'os_3' };
+  const text = `🐧 *Langkah 2/5: Pilih Kategori Sistem Operasi (OS)*\n\n` +
+    `Pilih distribusi Linux yang ingin Anda gunakan untuk VPS Railway:\n\n` +
+    `• 🍥 *Debian GNU/Linux* (5 Versi Rilis)\n` +
+    `• 🏹 *Arch Linux* (Rolling Release)\n` +
+    `• 🟠 *Ubuntu Linux* (6 Versi Rilis)\n` +
+    `• 🐉 *Kali Linux* (All Versions / Ethical Hacking)\n\n` +
+    `_Klik kategori distro di bawah untuk memilih versi rilis:_`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '🍥 Debian 12 (Bookworm) ⭐ [Rekomendasi]', callback_data: `pick_${debian12.code}` }
+        { text: '🍥 Debian Family (5 Distros)', callback_data: 'cat_debian' },
+        { text: '🏹 Arch Linux (Rolling)', callback_data: 'cat_arch' }
       ],
       [
-        { text: '🍥 Debian 11 (Bullseye)', callback_data: `pick_${debian11.code}` }
+        { text: '🟠 Ubuntu Linux (6 Distros)', callback_data: 'cat_ubuntu' },
+        { text: '🐉 Kali Linux (All Versions)', callback_data: 'cat_kali' }
       ],
       [
-        { text: '🏹 Arch Linux (Rolling Release) ⭐', callback_data: `pick_${arch.code}` }
+        { text: '🐳 Custom Docker Image OS', callback_data: 'os_custom_input' }
       ],
       [
         { text: '🏠 Menu Utama', callback_data: 'menu_main' }
@@ -646,12 +646,14 @@ function promptCustomOsInput(chatId, messageId) {
     `Ketik nama Docker base image yang ingin Anda gunakan untuk VPS container Railway:\n\n` +
     `*Contoh:* \n` +
     `• \`debian:12\` atau \`debian:11\`\n` +
-    `• \`archlinux:latest\`\n\n` +
+    `• \`ubuntu:24.04\` atau \`ubuntu:22.04\`\n` +
+    `• \`archlinux:latest\`\n` +
+    `• \`kalilinux/kali-rolling\`\n\n` +
     `_Silakan balas pesan ini dengan nama image Docker:_`;
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: '🔙 Kembali ke Pilihan OS', callback_data: 'flow_start_create' }],
+      [{ text: '🔙 Kembali ke Kategori OS', callback_data: 'flow_start_create' }],
       [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
     ]
   };
@@ -665,13 +667,33 @@ function promptCustomOsInput(chatId, messageId) {
 
 // Show Distro Releases within a Category
 function showOsCategory(chatId, messageId, categoryKey) {
-  return showOsMenu(chatId, messageId);
+  const cat = OS_CATALOG[categoryKey];
+  if (!cat) return showOsMenu(chatId, messageId);
+
+  const text = `${cat.icon} *PILIH VERSI DISTRO: ${cat.name.toUpperCase()}*\n\n` +
+    `ℹ️ _${cat.description}_\n\n` +
+    `Klik rilis yang ingin Anda jadikan sistem operasi VPS:`;
+
+  const buttons = [];
+  cat.distros.forEach((d) => {
+    const star = d.recommended ? ' ⭐' : '';
+    buttons.push([{ text: `${d.name}${star}`, callback_data: `pick_${d.code}` }]);
+  });
+
+  buttons.push([{ text: '🔙 Kembali ke Pilihan Kategori OS', callback_data: 'flow_start_create' }]);
+
+  bot.editMessageText(text, {
+    chat_id: chatId,
+    message_id: messageId,
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: buttons }
+  });
 }
 
 // Send Full Catalog Overview
 function sendCatalogOverview(chatId) {
   let text = `📚 *RAILWAY LINUX / CONTAINER OS CATALOG*\n\n` +
-    `Pilihan distribusi Linux yang didukung untuk Cloud VPS Railway:\n\n`;
+    `Daftar distribusi Linux yang didukung untuk Cloud VPS Railway:\n\n`;
 
   for (const [key, cat] of Object.entries(OS_CATALOG)) {
     text += `${cat.icon} *${cat.name}* (Pkg Manager: \`${cat.distros[0]?.pkg || 'apt'}\`)\n`;
@@ -683,7 +705,7 @@ function sendCatalogOverview(chatId) {
     text += `\n`;
   }
 
-  text += `💡 *Tips:* Pilih *Debian 12* untuk kestabilan maksimal atau *Arch Linux* untuk paket dan rilis software terbaru.`;
+  text += `💡 *Tips:* Semua distro sudah terpasang OpenSSH Server, Fastfetch, Neofetch, Python, Node.js, dan AI CLI.`;
 
   const keyboard = {
     inline_keyboard: [
@@ -1475,29 +1497,27 @@ async function handleReinstallOsMenu(chatId, messageId, projectId, page = 1) {
   const projectName = details?.name || savedDep?.project_name || 'r-server';
   const currentOs = details?.osName || savedDep?.os_name || 'Debian 12 (Bookworm)';
 
-  const debian12 = OS_CATALOG.debian?.distros?.find(d => d.id === 'debian:12') || { code: 'os_1' };
-  const debian11 = OS_CATALOG.debian?.distros?.find(d => d.id === 'debian:11') || { code: 'os_2' };
-  const arch = OS_CATALOG.arch?.distros?.find(d => d.id === 'archlinux:latest') || { code: 'os_3' };
-
   const text = `💿 *REINSTALL / GANTI SISTEM OPERASI (OS)*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🖥️ *Target VPS:* \`${projectName}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `🐧 *OS Saat Ini:* *${currentOs}*\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `Pilih sistem operasi baru yang ingin Anda pasang pada VPS ini:\n` +
+    `Pilih kategori distribusi Linux baru yang ingin Anda pasang pada VPS ini:\n` +
     `_(Semua IP Address, Port SSH & Domain Web tetap sama)_\n`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '🍥 Debian 12 (Bookworm) ⭐ [Rekomendasi]', callback_data: `rpick_${projectId}_${debian12.code}` }
+        { text: '🍥 Debian Family (5 Distros)', callback_data: `rcat_${projectId}_debian` },
+        { text: '🏹 Arch Linux (Rolling)', callback_data: `rcat_${projectId}_arch` }
       ],
       [
-        { text: '🍥 Debian 11 (Bullseye)', callback_data: `rpick_${projectId}_${debian11.code}` }
+        { text: '🟠 Ubuntu Linux (6 Distros)', callback_data: `rcat_${projectId}_ubuntu` },
+        { text: '🐉 Kali Linux (All Versions)', callback_data: `rcat_${projectId}_kali` }
       ],
       [
-        { text: '🏹 Arch Linux (Rolling Release) ⭐', callback_data: `rpick_${projectId}_${arch.code}` }
+        { text: '🐳 Custom Docker Image OS', callback_data: `rcust_${projectId}` }
       ],
       [
         { text: '🔙 Batal', callback_data: 'cmd_list' }
@@ -1509,7 +1529,30 @@ async function handleReinstallOsMenu(chatId, messageId, projectId, page = 1) {
 }
 
 async function handleReinstallOsCategory(chatId, messageId, projectId, categoryKey) {
-  return handleReinstallOsMenu(chatId, messageId, projectId);
+  const cat = OS_CATALOG[categoryKey];
+  if (!cat) return handleReinstallOsMenu(chatId, messageId, projectId);
+
+  const state = getUserState(chatId);
+  const token = state.data?.railwayToken || db.getSystemRailwayToken();
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const projectName = details?.name || 'r-server';
+
+  const text = `${cat.icon} *REINSTALL OS: PILIH RILIS ${cat.name.toUpperCase()}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `ℹ️ _${cat.description}_\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Pilih versi distro yang ingin diinstal ulang ke VPS ini:`;
+
+  const buttons = [];
+  cat.distros.forEach((d) => {
+    const star = d.recommended ? ' ⭐' : '';
+    buttons.push([{ text: `${d.name}${star}`, callback_data: `rpick_${projectId}_${d.code}` }]);
+  });
+
+  buttons.push([{ text: '🔙 Kembali ke Kategori OS', callback_data: `rmenu_${projectId}` }]);
+
+  safeEditMessage(chatId, messageId, text, { reply_markup: { inline_keyboard: buttons } });
 }
 
 function promptReinstallCustomOsInput(chatId, messageId, projectId) {
@@ -1524,7 +1567,9 @@ function promptReinstallCustomOsInput(chatId, messageId, projectId) {
     `Ketik nama Docker base image baru yang ingin Anda pasang di container VPS ini:\n\n` +
     `*Contoh:* \n` +
     `• \`debian:12\` atau \`debian:11\`\n` +
-    `• \`archlinux:latest\`\n\n` +
+    `• \`ubuntu:24.04\` atau \`ubuntu:22.04\`\n` +
+    `• \`archlinux:latest\`\n` +
+    `• \`kalilinux/kali-rolling\`\n\n` +
     `_Silakan balas pesan ini dengan nama image Docker:_`;
 
   const keyboard = {
