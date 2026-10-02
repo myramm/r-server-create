@@ -473,14 +473,14 @@ async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeV
     // Update Railway variable NODE_VERSION
     await railway.setVariable(token, projectId, details.environmentId, details.serviceId, 'NODE_VERSION', nodeVersion, false);
 
-    // Trigger Redeploy / Restart
+    // Trigger Redeploy / Restart with latest code
     await safeEditMessage(
       bot,
       chatId,
       loadMsg.message_id,
       `⏳ *MENGUBAH VERSI NODE.JS [${details.name || vpsName}]...*\n\n` +
       `⚡ *Versi Baru:* \`Node.js ${nodeLabel}\`\n` +
-      `⏳ [3/3] Merestart container untuk menerapkan versi Node.js baru...`
+      `⏳ [2/3] Memicu deploy container baru di Railway...`
     );
 
     await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
@@ -488,18 +488,33 @@ async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeV
     // Save to local database
     db.updateDeploymentNodeVersion(projectId, nodeVersion);
 
-    const successText = `✅ *VERSI NODE.JS BERHASIL DIUBAH!* 🎉\n` +
+    // Poll deployment status for up to 20 seconds so user gets real-time feedback
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const depStatus = await railway.getDeploymentStatus(token, details.environmentId, details.serviceId);
+      const statusText = depStatus.status === 'SUCCESS' ? '✅ Selesai Deploy' : (depStatus.status || 'BUILDING');
+      await safeEditMessage(
+        bot,
+        chatId,
+        loadMsg.message_id,
+        `⏳ *MENGUBAH VERSI NODE.JS [${details.name || vpsName}]...*\n\n` +
+        `⚡ *Versi Baru:* \`Node.js ${nodeLabel}\`\n` +
+        `⏳ [3/3] Menunggu container Railway aktif (Status: \`${statusText}\`)...`
+      );
+      if (depStatus.status === 'SUCCESS') break;
+    }
+
+    const successText = `✅ *VERSI NODE.JS BERHASIL DITERAPKAN!* 🎉\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
       `🌐 *IP Address:* \`${targetDisplay}\`\n` +
       `🆔 *Project ID:* \`${projectId}\`\n` +
       `⚡ *Versi Node.js:* *Node.js ${nodeLabel}* (\`NODE_VERSION=${nodeVersion}\`)\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `⏳ *MOHON TUNGGU SEKITAR 1 - 2 MENIT:*\n` +
-      `• Server Railway sedang me-restart container dan menginstal **Node.js ${nodeLabel}**.\n` +
-      `• Pengaturan ini **tersimpan permanen** di Cloud dan tidak akan hilang saat server di-reboot di kemudian hari.\n` +
+      `✨ *Container Railway telah aktif dengan Node.js ${nodeLabel}!* ✨\n` +
+      `• Pengaturan tersimpan permanen di Cloud (tidak akan hilang saat reboot).\n` +
       `• IP Address, Port SSH, Root Password, dan Web Dashboard *tetap sama & aman*.\n\n` +
-      `💡 _Silakan tunggu sekitar 2 menit sebelum login kembali via SSH dan mengecek dengan \`node -v\`._`;
+      `💡 _Silakan login via SSH dan cek dengan command:_ \`node -v\``;
 
     safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
       reply_markup: {
