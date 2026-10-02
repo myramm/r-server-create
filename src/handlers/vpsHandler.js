@@ -90,10 +90,13 @@ async function handleListProjects(bot, chatId, messageId) {
 
       const savedDep = db.getDeploymentByProjectId(p.id);
       const displayOs = p.osName || savedDep?.os_name || 'Debian 12 (Bookworm)';
+      const nodeVer = p.nodeVersion || savedDep?.node_version || '20';
+      const nodeDisplay = nodeVer === 'default' ? 'Default OS' : `v${nodeVer} LTS`;
 
       text += `${idx + 1}. 🖥️ *${p.name}*\n`;
       text += `   • ID: \`${p.id}\`\n`;
       text += `   • OS: *${displayOs}*\n`;
+      text += `   • Node.js: \`${nodeDisplay}\`\n`;
       text += `   • Status: ${isOnline ? '🟢 *Online*' : '🟡 *Menunggu Proxy*'}\n`;
       text += `   • Dibuat: \`${createdStr}\`\n`;
 
@@ -133,6 +136,7 @@ async function handleListProjects(bot, chatId, messageId) {
       buttons.push(row1);
 
       const row2 = [
+        { text: `⚡ Ganti Node.js`, callback_data: `vps_node_${p.id}` },
         { text: `💿 Reinstall OS`, callback_data: `reinstall_${p.id}` },
         { text: `🗑️ Hapus`, callback_data: `del_${p.id}` }
       ];
@@ -285,9 +289,179 @@ async function handleDeleteProject(bot, chatId, projectId) {
   }
 }
 
+async function handleShowChangeNodeMenu(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu untuk mengubah versi Node.js.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  let loadMsg;
+  if (messageId) {
+    await safeEditMessage(bot, chatId, messageId, '⏳ *Memuat data konfigurasi Node.js VPS...*');
+    loadMsg = { message_id: messageId };
+  } else {
+    loadMsg = await safeSendMessage(bot, chatId, '⏳ *Memuat data konfigurasi Node.js VPS...*');
+  }
+
+  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = details?.name || savedDep?.project_name || 'r-server';
+  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
+  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
+  const currentNode = details?.nodeVersion || savedDep?.node_version || '20';
+
+  const nodeNameMap = {
+    '22': 'v22 LTS (Jod - Terbaru & Paling Cepat)',
+    '20': 'v20 LTS (Iron - Stabil)',
+    '18': 'v18 LTS (Hydrogen - Legacy)',
+    'default': 'Default (Bawaan Paket OS Linux)'
+  };
+  const currentText = nodeNameMap[currentNode] || `v${currentNode}`;
+
+  const text = `⚡ *GANTI / ATUR VERSI NODE.JS VPS*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🌐 *IP Address:* \`${ipDisplay}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⚡ *Versi Saat Ini:* *${currentText}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Pilih versi Node.js yang ingin Anda pasang secara permanen di VPS ini:\n\n` +
+    `• 🟢 *Node.js v22 LTS (Jod)* — Direkomendasikan untuk performa AI, tool & V8 engine tercepat\n` +
+    `• 🔵 *Node.js v20 LTS (Iron)* — Sangat stabil & kompatibilitas tinggi\n` +
+    `• 🟠 *Node.js v18 LTS (Hydrogen)* — Versi legacy untuk script lama\n` +
+    `• ⚪ *Node.js Default* — Menggunakan paket bawaan OS distro Linux\n\n` +
+    `_Catatan: Pengaturan ini akan disimpan permanen di Railway Environment Variables dan tidak akan hilang saat server direstart._`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: `🟢 Node.js v22 LTS (Terbaru & Cepat)${currentNode === '22' ? ' ✅' : ''}`, callback_data: `setnode_${projectId}_22` }],
+      [{ text: `🔵 Node.js v20 LTS (Stabil & Aman)${currentNode === '20' ? ' ✅' : ''}`, callback_data: `setnode_${projectId}_20` }],
+      [{ text: `🟠 Node.js v18 LTS (Legacy)${currentNode === '18' ? ' ✅' : ''}`, callback_data: `setnode_${projectId}_18` }],
+      [{ text: `⚪ Node.js Default (Bawaan OS)${currentNode === 'default' ? ' ✅' : ''}`, callback_data: `setnode_${projectId}_default` }],
+      [{ text: '🔙 Kembali ke Daftar VPS', callback_data: 'cmd_list' }]
+    ]
+  };
+
+  return safeEditMessage(bot, chatId, loadMsg.message_id, text, { reply_markup: keyboard });
+}
+
+async function executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeVersion) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  if (!token) {
+    return safeSendMessage(bot, chatId, '⚠️ Silakan login Railway terlebih dahulu.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔑 Login Railway', callback_data: 'cmd_set_token' }]] }
+    });
+  }
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+  const sshHost = savedDep?.ssh_host || '-';
+  const sshPort = savedDep?.ssh_port || '22';
+  const ipDisplay = sshHost !== '-' ? `${sshHost}:${sshPort}` : '';
+
+  const nodeNameMap = {
+    '22': 'v22 LTS (Jod)',
+    '20': 'v20 LTS (Iron)',
+    '18': 'v18 LTS (Hydrogen)',
+    'default': 'Default OS'
+  };
+  const nodeLabel = nodeNameMap[nodeVersion] || `v${nodeVersion}`;
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MENGUBAH VERSI NODE.JS KE ${nodeLabel}...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`${ipDisplay ? ` (\`${ipDisplay}\`)` : ''}\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ [1/3] Mengambil konfigurasi Railway...`
+  );
+
+  try {
+    const details = await railway.getProjectDetails(token, projectId);
+    if (!details || !details.environmentId || !details.serviceId) {
+      throw new Error('Service atau Environment Railway tidak ditemukan.');
+    }
+
+    const fullIp = details.tcpIp || details.tcpHost || savedDep?.ssh_host || '-';
+    const fullPort = details.tcpPort || savedDep?.ssh_port || '22';
+    const targetDisplay = fullIp !== '-' ? `${fullIp}:${fullPort}` : (details.name || vpsName);
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MENGUBAH VERSI NODE.JS [${details.name || vpsName}]...*\n\n` +
+      `⚡ *Versi Baru:* \`Node.js ${nodeLabel}\`\n` +
+      `⏳ [2/3] Menyimpan environment variable \`NODE_VERSION=${nodeVersion}\` ke Railway...`
+    );
+
+    // Update Railway variable NODE_VERSION
+    await railway.setVariable(token, projectId, details.environmentId, details.serviceId, 'NODE_VERSION', nodeVersion, false);
+
+    // Trigger Redeploy / Restart
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MENGUBAH VERSI NODE.JS [${details.name || vpsName}]...*\n\n` +
+      `⚡ *Versi Baru:* \`Node.js ${nodeLabel}\`\n` +
+      `⏳ [3/3] Merestart container untuk menerapkan versi Node.js baru...`
+    );
+
+    await railway.triggerRedeploy(token, details.environmentId, details.serviceId);
+
+    // Save to local database
+    db.updateDeploymentNodeVersion(projectId, nodeVersion);
+
+    const successText = `✅ *VERSI NODE.JS BERHASIL DIUBAH!* 🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *VPS:* \`${details.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${targetDisplay}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `⚡ *Versi Node.js:* *Node.js ${nodeLabel}* (\`NODE_VERSION=${nodeVersion}\`)\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `⏳ *MOHON TUNGGU SEKITAR 1 - 2 MENIT:*\n` +
+      `• Server Railway sedang me-restart container dan menginstal **Node.js ${nodeLabel}**.\n` +
+      `• Pengaturan ini **tersimpan permanen** di Cloud dan tidak akan hilang saat server di-reboot di kemudian hari.\n` +
+      `• IP Address, Port SSH, Root Password, dan Web Dashboard *tetap sama & aman*.\n\n` +
+      `💡 _Silakan tunggu sekitar 2 menit sebelum login kembali via SSH dan mengecek dengan \`node -v\`._`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📋 Cek Status VPS', callback_data: 'cmd_list' }],
+          [{ text: '⚡ Ubah Node.js Lagi', callback_data: `vps_node_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal mengubah versi Node.js:*\n_${err.message}_`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `vps_node_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  }
+}
+
 module.exports = {
   handleListProjects,
   handleRestartProject,
   handleCheckBalance,
   handleDeleteProject,
+  handleShowChangeNodeMenu,
+  executeChangeNodeVersion,
 };

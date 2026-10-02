@@ -45,6 +45,8 @@ const {
   handleRestartProject,
   handleCheckBalance,
   handleDeleteProject,
+  handleShowChangeNodeMenu,
+  executeChangeNodeVersion,
 } = require('./handlers/vpsHandler');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -250,6 +252,17 @@ bot.on('callback_query', async (query) => {
   }
 
   // VPS Action Callbacks
+  if (data.startsWith('vps_node_')) {
+    const projectId = data.replace('vps_node_', '');
+    return handleShowChangeNodeMenu(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('setnode_')) {
+    const rest = data.replace('setnode_', '');
+    const idx = rest.indexOf('_');
+    const projectId = rest.substring(0, idx);
+    const nodeVersion = rest.substring(idx + 1);
+    return executeChangeNodeVersion(bot, chatId, messageId, projectId, nodeVersion);
+  }
   if (data.startsWith('reboot_')) {
     const projectId = data.replace('reboot_', '');
     return handleRestartProject(bot, chatId, projectId);

@@ -288,6 +288,15 @@ function updateDeploymentOs(projectId, osName) {
   }
 }
 
+function updateDeploymentNodeVersion(projectId, nodeVersion) {
+  try {
+    const stmt = db.prepare('UPDATE deployments SET node_version = ? WHERE project_id = ?');
+    return stmt.run(nodeVersion, projectId);
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = {
   db,
   getUser,
@@ -298,6 +307,7 @@ module.exports = {
   getUserDeployments,
   getDeploymentByProjectId,
   updateDeploymentOs,
+  updateDeploymentNodeVersion,
   getSession,
   saveSession,
   resetSession,
