@@ -36,40 +36,8 @@ function showOsMenu(bot, chatId, messageId) {
         { text: '🐉 Kali Linux (All Versions)', callback_data: 'cat_kali' }
       ],
       [
-        { text: '🐳 Custom Docker Image OS', callback_data: 'os_custom_input' }
-      ],
-      [
         { text: '🏠 Menu Utama', callback_data: 'menu_main' }
       ]
-    ]
-  };
-
-  if (messageId) {
-    safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
-  } else {
-    safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
-  }
-}
-
-// Prompt Custom Docker Base Image
-function promptCustomOsInput(bot, chatId, messageId) {
-  const state = getUserState(chatId);
-  state.step = 'AWAIT_CUSTOM_OS';
-  db.saveSession(chatId, state);
-
-  const text = `🐳 *Input Custom Docker Base Image OS*\n\n` +
-    `Ketik nama Docker base image yang ingin Anda gunakan untuk VPS container Railway:\n\n` +
-    `*Contoh:* \n` +
-    `• \`debian:12\` atau \`debian:11\`\n` +
-    `• \`ubuntu:24.04\` atau \`ubuntu:22.04\`\n` +
-    `• \`archlinux:latest\`\n` +
-    `• \`kalilinux/kali-rolling\`\n\n` +
-    `_Silakan balas pesan ini dengan nama image Docker:_`;
-
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '🔙 Kembali ke Kategori OS', callback_data: 'flow_start_create' }],
-      [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
     ]
   };
 
@@ -498,7 +466,6 @@ module.exports = {
   generatePassword,
   showOsMenu,
   showOsCategory,
-  promptCustomOsInput,
   showNodeMenu,
   showAiAgentsMenu,
   showToolsMenu,

@@ -25,7 +25,6 @@ const {
   generatePassword,
   showOsMenu,
   showOsCategory,
-  promptCustomOsInput,
   showNodeMenu,
   showAiAgentsMenu,
   showToolsMenu,
@@ -37,7 +36,6 @@ const {
 const {
   handleReinstallOsMenu,
   handleReinstallOsCategory,
-  promptReinstallCustomOsInput,
   handleReinstallConfirm,
   executeReinstallOs,
 } = require('./handlers/reinstallHandler');
@@ -141,9 +139,6 @@ bot.on('callback_query', async (query) => {
     }
     return showOsMenu(bot, chatId, messageId);
   }
-  if (data === 'os_custom_input') {
-    return promptCustomOsInput(bot, chatId, messageId);
-  }
   if (data.startsWith('cat_')) {
     const catKey = data.replace('cat_', '');
     return showOsCategory(bot, chatId, messageId, catKey);
@@ -246,10 +241,6 @@ bot.on('callback_query', async (query) => {
     const distroCode = rest.substring(idx + 1);
     return handleReinstallConfirm(bot, chatId, messageId, projectId, distroCode);
   }
-  if (data.startsWith('rcust_')) {
-    const projectId = data.replace('rcust_', '');
-    return promptReinstallCustomOsInput(bot, chatId, messageId, projectId);
-  }
   if (data.startsWith('rdo_')) {
     const rest = data.replace('rdo_', '');
     const idx = rest.indexOf('_');
@@ -318,34 +309,6 @@ bot.on('message', async (msg) => {
     } catch (err) {
       return safeEditMessage(bot, chatId, loadingMsg?.message_id, `❌ *Token Railway tidak valid!*\n\n_Detail: ${err.message}_\n\nSilakan periksa kembali dan kirim ulang:`);
     }
-  }
-
-  // Custom Docker Base OS Input
-  if (state.step === 'AWAIT_CUSTOM_OS') {
-    if (!text || text.length < 2) {
-      return safeSendMessage(bot, chatId, '⚠️ *Nama Docker image tidak valid.* Contoh: `ubuntu:24.04` atau `debian:12`');
-    }
-    state.data.os = text;
-    state.data.osName = `Custom Container (${text})`;
-    state.step = 'IDLE';
-    db.saveSession(chatId, state);
-
-    const sentMsg = await safeSendMessage(bot, chatId, `✅ *Base OS berhasil dipilih:* \`${text}\``);
-    return showNodeMenu(bot, chatId, sentMsg?.message_id);
-  }
-
-  // Custom Docker Base OS for Reinstall
-  if (state.step === 'AWAIT_REINSTALL_CUSTOM_OS') {
-    if (!text || text.length < 2) {
-      return safeSendMessage(bot, chatId, '⚠️ *Nama Docker image tidak valid.* Contoh: `ubuntu:24.04` atau `debian:12`');
-    }
-    const projectId = state.data.reinstallProjectId;
-    state.data.reinstallCustomImage = text;
-    state.step = 'IDLE';
-    db.saveSession(chatId, state);
-
-    const sentMsg = await safeSendMessage(bot, chatId, `✅ *Base OS Reinstall dipilih:* \`${text}\``);
-    return handleReinstallConfirm(bot, chatId, sentMsg?.message_id, projectId, 'custom', `Custom (${text})`);
   }
 
   // Manual Password input

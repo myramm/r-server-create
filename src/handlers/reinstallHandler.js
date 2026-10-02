@@ -54,9 +54,6 @@ async function handleReinstallOsMenu(bot, chatId, messageId, projectId) {
         { text: '🐉 Kali Linux (All Versions)', callback_data: `rcat_${projectId}_kali` }
       ],
       [
-        { text: '🐳 Custom Docker Image OS', callback_data: `rcust_${projectId}` }
-      ],
-      [
         { text: '🔙 Batal', callback_data: 'cmd_list' }
       ]
     ]
@@ -98,62 +95,12 @@ async function handleReinstallOsCategory(bot, chatId, messageId, projectId, cate
   safeEditMessage(bot, chatId, messageId, text, { reply_markup: { inline_keyboard: buttons } });
 }
 
-async function promptReinstallCustomOsInput(bot, chatId, messageId, projectId) {
-  const state = getUserState(chatId);
-  state.step = 'AWAIT_REINSTALL_CUSTOM_OS';
-  state.data.reinstallProjectId = projectId;
-  db.saveSession(chatId, state);
-
-  const token = state.data?.railwayToken || db.getSystemRailwayToken();
-  const details = await railway.getProjectDetails(token, projectId).catch(() => null);
-  const savedDep = db.getDeploymentByProjectId(projectId);
-  const projectName = details?.name || savedDep?.project_name || 'r-server';
-  const sshHost = details?.tcpHost || savedDep?.ssh_host || '-';
-  const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
-  const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
-  const ipDisplay = sshIp !== '-' ? `${sshIp}:${sshPort}` : '-';
-
-  const text = `🐳 *REINSTALL OS: INPUT CUSTOM DOCKER IMAGE*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🖥️ *Target VPS:* \`${projectName}\` (\`${ipDisplay}\`)\n` +
-    `🆔 *Project ID:* \`${projectId}\`\n` +
-    `⚠️ *PERINGATAN: Reinstall = SEMUA DATA VPS AKAN TERHAPUS BERSIH (HILANG)!*\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `Ketik nama Docker base image baru yang ingin Anda pasang di container VPS ini:\n\n` +
-    `*Contoh:* \n` +
-    `• \`debian:12\` atau \`debian:11\`\n` +
-    `• \`ubuntu:24.04\` atau \`ubuntu:22.04\`\n` +
-    `• \`archlinux:latest\`\n` +
-    `• \`kalilinux/kali-rolling\`\n\n` +
-    `_Silakan balas pesan ini dengan nama image Docker:_`;
-
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '🔙 Batal & Kembali', callback_data: `rmenu_${projectId}` }]
-    ]
-  };
-
-  if (messageId) {
-    safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
-  } else {
-    safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
-  }
-}
-
-async function handleReinstallConfirm(bot, chatId, messageId, projectId, distroCodeOrId, customName = null) {
+async function handleReinstallConfirm(bot, chatId, messageId, projectId, distroCodeOrId) {
   const state = getUserState(chatId);
   const token = state.data?.railwayToken || db.getSystemRailwayToken();
   if (!token) return promptTokenInput(bot, chatId, messageId);
 
-  let distro = getDistroByCode(distroCodeOrId);
-  if (!distro) {
-    if (distroCodeOrId === 'custom' && state.data.reinstallCustomImage) {
-      distro = { id: state.data.reinstallCustomImage, name: customName || `Custom (${state.data.reinstallCustomImage})` };
-    } else {
-      distro = findDistro(distroCodeOrId);
-      if (customName) distro.name = customName;
-    }
-  }
+  let distro = getDistroByCode(distroCodeOrId) || findDistro(distroCodeOrId);
 
   const details = await railway.getProjectDetails(token, projectId).catch(() => null);
   const savedDep = db.getDeploymentByProjectId(projectId);
@@ -179,7 +126,7 @@ async function handleReinstallConfirm(bot, chatId, messageId, projectId, distroC
     `• Password root tetap aman.\n\n` +
     `❓ *Apakah Anda yakin ingin menghapus data & melakukan reinstall sekarang?*`;
 
-  const doCallback = distroCodeOrId === 'custom' ? `rdo_${projectId}_custom` : `rdo_${projectId}_${distro.code || distro.id}`;
+  const doCallback = `rdo_${projectId}_${distro.code || distro.id}`;
 
   const keyboard = {
     inline_keyboard: [
@@ -197,14 +144,7 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
   let token = state.data?.railwayToken || db.getSystemRailwayToken();
   if (!token) return promptTokenInput(bot, chatId, messageId);
 
-  let distro = getDistroByCode(distroCodeOrId);
-  if (!distro) {
-    if (distroCodeOrId === 'custom' && state.data.reinstallCustomImage) {
-      distro = { id: state.data.reinstallCustomImage, name: `Custom Container (${state.data.reinstallCustomImage})` };
-    } else {
-      distro = findDistro(distroCodeOrId);
-    }
-  }
+  let distro = getDistroByCode(distroCodeOrId) || findDistro(distroCodeOrId);
 
   const preDetails = await railway.getProjectDetails(token, projectId).catch(() => null);
   const savedDep = db.getDeploymentByProjectId(projectId);
@@ -353,7 +293,6 @@ async function executeReinstallOs(bot, chatId, messageId, projectId, distroCodeO
 module.exports = {
   handleReinstallOsMenu,
   handleReinstallOsCategory,
-  promptReinstallCustomOsInput,
   handleReinstallConfirm,
   executeReinstallOs,
 };
