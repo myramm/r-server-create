@@ -66,9 +66,28 @@ if (!BOT_TOKEN) {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // -------------------------------------------------------------
+// Register Telegram Slash Commands Menu Button
+// -------------------------------------------------------------
+bot.setMyCommands([
+  { command: 'start', description: '🏠 Menu Utama & Navigasi' },
+  { command: 'list', description: '📋 Daftar & Status VPS Anda' },
+  { command: 'create', description: '➕ Buat VPS Linux Baru' },
+  { command: 'balance', description: '💰 Cek Saldo & Credit Railway' },
+  { command: 'profile', description: '👤 Profil & Status Akun' },
+  { command: 'catalog', description: '📦 Katalog Distro OS Linux' },
+  { command: 'apps', description: '🛠️ Katalog 40+ Software & AI' },
+  { command: 'login', description: '🔑 Set / Ganti Token Railway' },
+  { command: 'help', description: 'ℹ️ Panduan & Tutorial Bot' },
+]).then(() => {
+  console.log('✅ [Telegram Bot] Commands menu registered successfully');
+}).catch((err) => {
+  console.error('⚠️ [Telegram Bot] Failed to set bot commands:', err.message);
+});
+
+// -------------------------------------------------------------
 // Command Handlers
 // -------------------------------------------------------------
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start|\/menu/, (msg) => {
   const chatId = msg.chat.id;
   const name = msg.from.first_name || 'User';
   sendMainMenu(bot, chatId, name);
@@ -85,7 +104,10 @@ bot.onText(/\/create/, (msg) => {
 });
 
 bot.onText(/\/list/, (msg) => handleListProjects(bot, msg.chat.id));
-bot.onText(/\/balance/, (msg) => handleCheckBalance(bot, msg.chat.id));
+bot.onText(/\/balance|\/saldo/, (msg) => handleCheckBalance(bot, msg.chat.id));
+bot.onText(/\/profile/, (msg) => handleShowProfile(bot, msg.chat.id));
+bot.onText(/\/catalog/, (msg) => sendCatalogOverview(bot, msg.chat.id));
+bot.onText(/\/apps/, (msg) => sendAppsCatalog(bot, msg.chat.id));
 bot.onText(/\/reinstall/, (msg) => handleListProjects(bot, msg.chat.id));
 bot.onText(/\/help|\/tutorial/, (msg) => sendTutorialToken(bot, msg.chat.id));
 
