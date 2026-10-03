@@ -56,6 +56,9 @@ const {
   executeSetAiToken,
   executeResetAiAgent,
   handleExecAiBackup,
+  handleShowRestoreMenu,
+  handlePromptUploadBackup,
+  executeRestoreFromFile,
   handleExecAiRestore,
   handleExecAiStatus
 } = require('./handlers/vpsHandler');
@@ -330,6 +333,14 @@ bot.on('callback_query', async (query) => {
     const projectId = data.replace('ai_exec_backup_', '');
     return handleExecAiBackup(bot, chatId, messageId, projectId);
   }
+  if (data.startsWith('ai_restore_menu_')) {
+    const projectId = data.replace('ai_restore_menu_', '');
+    return handleShowRestoreMenu(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('ai_prompt_upload_backup_')) {
+    const projectId = data.replace('ai_prompt_upload_backup_', '');
+    return handlePromptUploadBackup(bot, chatId, messageId, projectId);
+  }
   if (data.startsWith('ai_exec_restore_')) {
     const projectId = data.replace('ai_exec_restore_', '');
     return handleExecAiRestore(bot, chatId, messageId, projectId);
@@ -433,6 +444,39 @@ bot.on('message', async (msg) => {
     state.step = 'IDLE';
     db.saveSession(chatId, state);
     return executeSetAiToken(bot, chatId, targetProjectId, aiAgentType, text);
+  }
+});
+
+// -------------------------------------------------------------
+// Document Upload Handler (for AI Backup .tar.gz restore)
+// -------------------------------------------------------------
+bot.on('document', async (msg) => {
+  const chatId = msg.chat.id;
+  const state = getUserState(chatId);
+  const doc = msg.document;
+
+  if (!doc) return;
+
+  const fileName = doc.file_name || 'backup.tar.gz';
+  let targetProjectId = state.data?.targetProjectId;
+
+  if (!targetProjectId) {
+    const userDeps = db.getDeploymentsByChatId(chatId);
+    if (userDeps && userDeps.length > 0) {
+      targetProjectId = userDeps[0].project_id;
+    }
+  }
+
+  if (state.step === 'AWAIT_BACKUP_FILE' || fileName.endsWith('.tar.gz') || fileName.includes('ai-agent-backup')) {
+    if (!targetProjectId) {
+      return safeSendMessage(bot, chatId, '⚠️ *Pilih VPS Target Terlebih Dahulu:*\nBuka menu AI Agents pada VPS yang ingin Anda restore file backup ini.', {
+        reply_markup: { inline_keyboard: [[{ text: '📋 Daftar VPS', callback_data: 'cmd_list' }]] }
+      });
+    }
+
+    state.step = 'IDLE';
+    db.saveSession(chatId, state);
+    return executeRestoreFromFile(bot, chatId, targetProjectId, doc.file_id, fileName);
   }
 });
 

@@ -2,6 +2,8 @@ const db = require('../services/database');
 const railway = require('../services/railway');
 const { safeSendMessage, safeEditMessage, getUserState } = require('../utils/telegram');
 const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 function execSshCommand(host, port, password, cmd, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
@@ -14,6 +16,36 @@ function execSshCommand(host, port, password, cmd, timeoutMs = 15000) {
         return reject(new Error(stderr || error.message));
       }
       resolve(stdout.trim());
+    });
+  });
+}
+
+function scpDownloadFile(host, port, password, remotePath, localPath, timeoutMs = 45000) {
+  return new Promise((resolve, reject) => {
+    if (!host || host === '-' || !port || !password) {
+      return reject(new Error('Informasi SSH (IP, Port, Password) belum lengkap.'));
+    }
+    const safeCmd = `sshpass -p '${password}' scp -P ${port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${host}:${remotePath} ${localPath}`;
+    exec(safeCmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
+      if (error) {
+        return reject(new Error(stderr || error.message));
+      }
+      resolve(localPath);
+    });
+  });
+}
+
+function scpUploadFile(host, port, password, localPath, remotePath, timeoutMs = 45000) {
+  return new Promise((resolve, reject) => {
+    if (!host || host === '-' || !port || !password) {
+      return reject(new Error('Informasi SSH (IP, Port, Password) belum lengkap.'));
+    }
+    const safeCmd = `sshpass -p '${password}' scp -P ${port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${localPath} root@${host}:${remotePath}`;
+    exec(safeCmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
+      if (error) {
+        return reject(new Error(stderr || error.message));
+      }
+      resolve(remotePath);
     });
   });
 }
@@ -746,11 +778,11 @@ async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
         { text: '➕ Tambah / Ganti Akun AI 🔑', callback_data: `ai_add_menu_${projectId}` }
       ],
       [
-        { text: '💾 Backup Data AI ☁️', callback_data: `ai_exec_backup_${projectId}` },
-        { text: '🔄 Restore Data Login ⚡', callback_data: `ai_exec_restore_${projectId}` }
+        { text: '💾 Backup Data AI (Kirim File ke Chat) 📦', callback_data: `ai_exec_backup_${projectId}` }
       ],
       [
-        { text: '📊 Cek Status Login AI Agent 📋', callback_data: `ai_exec_status_${projectId}` }
+        { text: '🔄 Restore Data Login ⚡', callback_data: `ai_restore_menu_${projectId}` },
+        { text: '📊 Cek Status Login 📋', callback_data: `ai_exec_status_${projectId}` }
       ],
       [
         { text: '⚡ Reset Antigravity (AGY)', callback_data: `ai_clean_agy_${projectId}` },
@@ -1172,9 +1204,10 @@ async function handleExecAiBackup(bot, chatId, messageId, projectId) {
     `⏳ *MEMPROSES BACKUP DATA AI AGENTS...*\n\n` +
     `🖥️ *Target VPS:* \`${vpsName}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
-    `⏳ Mengarsip data token, login, prompt & config via SSH...`
+    `⏳ [1/3] Mengarsip token & konfigurasi di VPS...`
   );
 
+  let localFilePath = null;
   try {
     const details = token ? await railway.getProjectDetails(token, projectId).catch(() => null) : null;
     const sshHost = details?.tcpHost || savedDep?.ssh_host;
@@ -1182,23 +1215,209 @@ async function handleExecAiBackup(bot, chatId, messageId, projectId) {
     const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
     const password = savedDep?.root_password || 'RamaGans76_';
 
-    const output = await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync backup');
+    await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync backup');
 
-    const successText = `✅ *BACKUP DATA AI AGENTS BERHASIL!* 💾🎉\n` +
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES BACKUP DATA AI AGENTS...*\n\n` +
+      `⏳ [2/3] Mengunduh file arsip backup dari VPS...`
+    );
+
+    const safeName = (details?.name || vpsName).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const localFileName = `ai-agent-backup-${safeName}-${Date.now()}.tar.gz`;
+    localFilePath = path.join('/tmp', localFileName);
+
+    await scpDownloadFile(sshIp || sshHost, sshPort, password, '/var/lib/ara/ai-backup/ai-agent-auth.tar.gz', localFilePath);
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES BACKUP DATA AI AGENTS...*\n\n` +
+      `⏳ [3/3] Mengirimkan file arsip (.tar.gz) ke chat Telegram Anda...`
+    );
+
+    const stat = fs.statSync(localFilePath);
+    const sizeMb = (stat.size / (1024 * 1024)).toFixed(1);
+
+    const caption = `📦 *FILE BACKUP DATA AI AGENTS* 💾🎉\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🖥️ *Target VPS:* \`${details?.name || vpsName}\`\n` +
       `🌐 *IP Address:* \`${sshIp}:${sshPort}\`\n` +
-      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `📦 *Ukuran File:* \`${sizeMb} MB\`\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `📦 *LOKASI ARSIP BACKUP:*\n` +
-      `• \`/var/lib/ara/ai-backup/ai-agent-auth.tar.gz\`\n\n` +
-      `🔒 *DATA YANG BERHASIL DIAMANKAN:*\n` +
+      `🔒 *DATA YANG TERKANDUNG:*\n` +
       `• ⚡ Google Antigravity (\`.gemini/\` & \`GEMINI.md\`)\n` +
       `• 🟣 Claude Code CLI (\`.claude/\` & \`.claude.json\`)\n` +
       `• 🤖 Hermes Agent (\`.hermes/\` & \`SOUL.md\`)\n` +
       `• 🚀 OpenCode AI (\`.config/opencode/\`)\n` +
       `• 🛡️ Freebuff, Aider, Git & SSH config\n\n` +
-      `✨ *Semua data tersimpan dan akan otomatis di-restore saat container menyala ulang!*`;
+      `💡 *Cara Restore di VPS Baru / Kapan Saja:*\n` +
+      `Cukup kirim/forward file dokumen \`.tar.gz\` ini kembali ke bot Telegram!`;
+
+    await bot.sendDocument(chatId, localFilePath, {
+      caption,
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📊 Cek Status Login AI', callback_data: `ai_exec_status_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
+        ]
+      }
+    }, {
+      filename: `ai-agent-backup-${safeName}.tar.gz`,
+      contentType: 'application/gzip'
+    });
+
+    if (localFilePath && fs.existsSync(localFilePath)) {
+      try { fs.unlinkSync(localFilePath); } catch (e) {}
+    }
+    bot.deleteMessage(chatId, loadMsg.message_id).catch(() => {});
+  } catch (err) {
+    if (localFilePath && fs.existsSync(localFilePath)) {
+      try { fs.unlinkSync(localFilePath); } catch (e) {}
+    }
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal membuat & mengirim backup:*\n_${err.message}_\n\n💡 Pastikan server VPS dalam keadaan aktif (online).`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `ai_exec_backup_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
+        ]
+      }
+    });
+  }
+}
+
+async function handleShowRestoreMenu(bot, chatId, messageId, projectId) {
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = savedDep?.project_name || 'r-server';
+
+  const text = `🔄 *RESTORE DATA LOGIN AI AGENTS*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Pilih metode pemulihan (*restore*) yang ingin Anda gunakan:\n\n` +
+    `1️⃣ *Restore Otomatis dari VPS*\n` +
+    `Memulihkan file backup yang sudah tersimpan di direktori server VPS (\`/var/lib/ara/ai-backup/\`).\n\n` +
+    `2️⃣ *Upload File Backup (.tar.gz)*\n` +
+    `Kirimkan file arsip backup (.tar.gz) yang tersimpan di HP/PC Anda ke chat bot ini untuk dipulihkan ke VPS.`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '⚡ Restore dari Backup VPS', callback_data: `ai_exec_restore_${projectId}` }
+      ],
+      [
+        { text: '📂 Upload File Backup (.tar.gz)', callback_data: `ai_prompt_upload_backup_${projectId}` }
+      ],
+      [
+        { text: '🔙 Kembali ke Hub AI', callback_data: `vps_ai_${projectId}` },
+        { text: '🏠 Menu Utama', callback_data: 'menu_main' }
+      ]
+    ]
+  };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function handlePromptUploadBackup(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  state.step = 'AWAIT_BACKUP_FILE';
+  state.data.targetProjectId = projectId;
+  db.saveSession(chatId, state);
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const projectName = savedDep?.project_name || 'r-server';
+
+  const text = `📂 *KIRIMKAN FILE BACKUP AI AGENT (.tar.gz)*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🖥️ *Target VPS:* \`${projectName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Silakan **kirimkan (upload) atau forward file dokumen \`.tar.gz\`** backup Anda ke kolom chat Telegram ini.\n\n` +
+    `💡 _Bot akan otomatis mengunggah dan me-restore seluruh kredensial AI ke VPS._`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '❌ Batalkan', callback_data: `ai_restore_menu_${projectId}` }]
+    ]
+  };
+
+  if (messageId) {
+    return safeEditMessage(bot, chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    return safeSendMessage(bot, chatId, text, { reply_markup: keyboard });
+  }
+}
+
+async function executeRestoreFromFile(bot, chatId, projectId, fileId, originalFilename) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMPROSES RESTORE DARI FILE UPLOAD...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `📁 *File:* \`${originalFilename || 'ai-agent-backup.tar.gz'}\`\n` +
+    `⏳ [1/3] Mengunduh file dari Telegram...`
+  );
+
+  let localPath = null;
+  try {
+    localPath = await bot.downloadFile(fileId, '/tmp');
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES RESTORE DARI FILE UPLOAD...*\n\n` +
+      `⏳ [2/3] Mengunggah file backup ke VPS via SSH/SCP...`
+    );
+
+    const details = token ? await railway.getProjectDetails(token, projectId).catch(() => null) : null;
+    const sshHost = details?.tcpHost || savedDep?.ssh_host;
+    const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+    const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+    const password = savedDep?.root_password || 'RamaGans76_';
+
+    await execSshCommand(sshIp || sshHost, sshPort, password, 'mkdir -p /var/lib/ara/ai-backup');
+    await scpUploadFile(sshIp || sshHost, sshPort, password, localPath, '/var/lib/ara/ai-backup/ai-agent-auth.tar.gz');
+
+    await safeEditMessage(
+      bot,
+      chatId,
+      loadMsg.message_id,
+      `⏳ *MEMPROSES RESTORE DARI FILE UPLOAD...*\n\n` +
+      `⏳ [3/3] Memulihkan kredensial AI ke /root/...`
+    );
+
+    await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync restore');
+
+    if (localPath && fs.existsSync(localPath)) {
+      try { fs.unlinkSync(localPath); } catch (e) {}
+    }
+
+    const successText = `✅ *DATA LOGIN AI BERHASIL DI-RESTORE KE VPS!* ⚡🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *Target VPS:* \`${details?.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${sshIp}:${sshPort}\`\n` +
+      `📁 *File Sumber:* \`${originalFilename || 'ai-agent-backup.tar.gz'}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `✨ *STATUS PEMULIHAN:*\n` +
+      `• Seluruh token login, sesi, dan prompt dari file backup telah aktif kembali di VPS.\n` +
+      `• Anda bisa langsung menjalankan \`agy\`, \`claude\`, \`hermes\`, atau \`opencode\` di terminal SSH tanpa perlu login ulang!`;
 
     safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
       reply_markup: {
@@ -1210,10 +1429,13 @@ async function handleExecAiBackup(bot, chatId, messageId, projectId) {
       }
     });
   } catch (err) {
-    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal membuat backup via SSH:*\n_${err.message}_\n\n💡 Pastikan server VPS dalam keadaan aktif (online).`, {
+    if (localPath && fs.existsSync(localPath)) {
+      try { fs.unlinkSync(localPath); } catch (e) {}
+    }
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal me-restore file backup:*\n_${err.message}_\n\n💡 Pastikan file adalah arsip .tar.gz yang valid.`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔄 Coba Lagi', callback_data: `ai_exec_backup_${projectId}` }],
+          [{ text: '🔄 Coba Upload Lagi', callback_data: `ai_prompt_upload_backup_${projectId}` }],
           [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
         ]
       }
@@ -1317,7 +1539,7 @@ async function handleExecAiStatus(bot, chatId, messageId, projectId) {
         inline_keyboard: [
           [
             { text: '💾 Backup Sekarang', callback_data: `ai_exec_backup_${projectId}` },
-            { text: '🔄 Restore Data', callback_data: `ai_exec_restore_${projectId}` }
+            { text: '🔄 Restore Data', callback_data: `ai_restore_menu_${projectId}` }
           ],
           [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }],
           [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
@@ -1352,6 +1574,9 @@ module.exports = {
   executeSetAiToken,
   executeResetAiAgent,
   handleExecAiBackup,
+  handleShowRestoreMenu,
+  handlePromptUploadBackup,
+  executeRestoreFromFile,
   handleExecAiRestore,
   handleExecAiStatus
 };
