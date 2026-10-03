@@ -7,6 +7,7 @@
     "start": "node bot.js"
   },
   "dependencies": {
+    "@railway/cli": "^5.63.1",
     "axios": "^1.7.9",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^16.4.7",

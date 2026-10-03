@@ -120,10 +120,17 @@ function saveUser(chatId, data = {}) {
  */
 function getSystemRailwayToken() {
   try {
-    const configPath = path.join(os.homedir(), '.railway', 'config.json');
-    if (fs.existsSync(configPath)) {
-      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return parsed.user?.accessToken || parsed.user?.token || null;
+    const configPaths = [
+      path.join(os.homedir(), '.railway', 'config.json'),
+      path.join(os.homedir(), 'config.json'),
+      path.join(os.homedir(), '.config', 'railway', 'config.json')
+    ];
+    for (const configPath of configPaths) {
+      if (fs.existsSync(configPath)) {
+        const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const token = parsed.user?.accessToken || parsed.user?.token || parsed.accessToken || parsed.token || null;
+        if (token) return token;
+      }
     }
   } catch (e) {}
   return null;
