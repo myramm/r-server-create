@@ -833,32 +833,46 @@ async function handleShowAddAiAccountMenu(bot, chatId, messageId, projectId) {
     `🌐 *IP Address:* \`${ipDisplay}\`\n` +
     `🆔 *Project ID:* \`${projectId}\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `Pilih AI Agent yang ingin Anda hubungkan atau ganti akunnya:\n\n` +
-    `• ⚡ *Google Antigravity (AGY)* — OAuth Token / Gemini API Key\n` +
-    `• 🟣 *Claude Code CLI* — Anthropic Auth Token / API Key (\`sk-ant-...\`)\n` +
-    `• 🚀 *OpenCode AI* — OpenAI API Key (\`sk-...\`) / OpenCode Token\n` +
-    `• 💎 *Google Gemini API Key* — (\`AIzaSy...\`)\n` +
-    `• 🐋 *DeepSeek API Key* — (\`sk-...\`)\n` +
-    `• 🛡️ *Aider AI Assistant* — OpenAI / Anthropic / DeepSeek Key\n` +
-    `• ☁️ *GitHub Token (Auto-Backup & Sync)* — (\`ghp_...\` / \`github_pat_...\`)\n\n` +
-    `_Klik tombol AI Agent di bawah untuk memasukkan token/key:_`;
+    `Pilih AI Agent / Provider Free yang ingin Anda hubungkan:\n\n` +
+    `• 🌐 *OpenRouter* — (\`sk-or-v1-...\`) Free models (Space-Bunny, Nemotron, Gemma)\n` +
+    `• ⚡ *Groq AI* — (\`gsk_...\`) Ultra-Fast Free (Llama-3.3 70B, DeepSeek-R1 Distill)\n` +
+    `• 🚀 *Cerebras AI* — (\`csk-...\`) World's Fastest Inference (2,000 tps)\n` +
+    `• 🧠 *SambaNova* — Free Llama 3.1 405B & DeepSeek-R1\n` +
+    `• 🌪 *Mistral AI* — Free Tier (Codestral, Mistral Small)\n` +
+    `• 💎 *Google Gemini* — (\`AIzaSy...\`) Free 15 RPM (Gemini 2.0 Flash)\n` +
+    `• 🟣 *Claude Code CLI* — Anthropic Auth Token / Key (\`sk-ant-...\`)\n` +
+    `• ⚡ *Google Antigravity* — OAuth / Gemini API Key\n` +
+    `• 🚀 *OpenCode AI* — OpenAI API Key / Token\n` +
+    `• 🐋 *DeepSeek API* — (\`sk-...\`)\n` +
+    `• ⚡ *Atria AI* — (\`atr_...\`)\n` +
+    `• ☁️ *GitHub Token* — (\`ghp_...\`) GitHub Models & Auto-Sync\n\n` +
+    `_Klik tombol di bawah untuk memasukkan token/key:_`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '⚡ Antigravity (AGY)', callback_data: `ai_prompt_agy_${projectId}` },
-        { text: '🟣 Claude Code', callback_data: `ai_prompt_claude_${projectId}` }
+        { text: '🌐 OpenRouter (Free)', callback_data: `ai_prompt_openrouter_${projectId}` },
+        { text: '⚡ Groq (Fast Free)', callback_data: `ai_prompt_groq_${projectId}` }
+      ],
+      [
+        { text: '🚀 Cerebras (2000 tps)', callback_data: `ai_prompt_cerebras_${projectId}` },
+        { text: '🧠 SambaNova (405B)', callback_data: `ai_prompt_sambanova_${projectId}` }
+      ],
+      [
+        { text: '🌪 Mistral AI (Free)', callback_data: `ai_prompt_mistral_${projectId}` },
+        { text: '💎 Google Gemini (Free)', callback_data: `ai_prompt_gemini_${projectId}` }
+      ],
+      [
+        { text: '🟣 Claude Code', callback_data: `ai_prompt_claude_${projectId}` },
+        { text: '⚡ Antigravity (AGY)', callback_data: `ai_prompt_agy_${projectId}` }
       ],
       [
         { text: '🚀 OpenCode AI', callback_data: `ai_prompt_opencode_${projectId}` },
-        { text: '💎 Gemini API Key', callback_data: `ai_prompt_gemini_${projectId}` }
+        { text: '🐋 DeepSeek API', callback_data: `ai_prompt_deepseek_${projectId}` }
       ],
       [
-        { text: '🐋 DeepSeek API Key', callback_data: `ai_prompt_deepseek_${projectId}` },
-        { text: '🛡️ Aider AI Key', callback_data: `ai_prompt_aider_${projectId}` }
-      ],
-      [
-        { text: '☁️ GitHub Token (Auto-Backup & Sync)', callback_data: `ai_prompt_github_${projectId}` }
+        { text: '⚡ Atria AI Key', callback_data: `ai_prompt_atria_${projectId}` },
+        { text: '☁️ GitHub Token / Models', callback_data: `ai_prompt_github_${projectId}` }
       ],
       [
         { text: '🔙 Kembali ke Hub AI', callback_data: `vps_ai_${projectId}` },
@@ -891,7 +905,13 @@ async function handlePromptAiToken(bot, chatId, messageId, projectId, agentType)
     'gemini': 'Google Gemini API',
     'deepseek': 'DeepSeek API',
     'aider': 'Aider AI Assistant',
-    'github': 'GitHub Cloud Auto-Backup'
+    'openrouter': 'OpenRouter API Key (Free Models)',
+    'groq': 'Groq AI (Fast Free Tier)',
+    'cerebras': 'Cerebras AI (2,000 tps Free)',
+    'sambanova': 'SambaNova (Free 405B & DeepSeek-R1)',
+    'mistral': 'Mistral AI (Codestral Free Tier)',
+    'atria': 'Atria AI API Key',
+    'github': 'GitHub Token & GitHub Models'
   };
   const label = agentLabelMap[agentType] || 'AI Agent';
 
@@ -899,10 +919,16 @@ async function handlePromptAiToken(bot, chatId, messageId, projectId, agentType)
     'agy': 'OAuth Token dari antigravity-cli atau Gemini API Key (AIzaSy...)',
     'claude': 'Anthropic Token atau API Key (sk-ant-api03-...)',
     'opencode': 'OpenAI API Key (sk-proj-...) atau Token OpenCode',
-    'gemini': 'Gemini API Key dari Google AI Studio (AIzaSy...)',
+    'gemini': 'Gemini API Key dari aistudio.google.com (AIzaSy...) — Free 15 RPM',
     'deepseek': 'DeepSeek API Key (sk-...)',
     'aider': 'OpenAI / Anthropic / DeepSeek API Key',
-    'github': 'Personal Access Token GitHub (ghp_... atau github_pat_...) dengan izin repo'
+    'openrouter': 'OpenRouter API Key (sk-or-v1-...) dari openrouter.ai/keys',
+    'groq': 'Groq API Key (gsk_...) dari console.groq.com/keys — Free 30 RPM',
+    'cerebras': 'Cerebras API Key (csk-...) dari cloud.cerebras.ai — Free 2000 tps',
+    'sambanova': 'SambaNova API Key dari cloud.sambanova.ai — Free Llama 405B',
+    'mistral': 'Mistral API Key dari console.mistral.ai — Free Tier',
+    'atria': 'Atria AI API Key (atr_...)',
+    'github': 'Personal Access Token GitHub (ghp_... atau github_pat_...)'
   };
   const hint = hintMap[agentType] || 'Token / API Key';
 
@@ -949,6 +975,8 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
     'gemini': 'Google Gemini API',
     'deepseek': 'DeepSeek API',
     'aider': 'Aider AI Assistant',
+    'openrouter': 'OpenRouter API Key (Free Models)',
+    'atria': 'Atria AI API Key',
     'github': 'GitHub Cloud Auto-Backup'
   };
   const label = agentLabelMap[agentType] || 'AI Agent';
@@ -1012,6 +1040,31 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
       if (cleanVal.startsWith('sk-')) {
         await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENAI_API_KEY', cleanVal, true);
       }
+    } else if (agentType === 'openrouter') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENROUTER_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.openrouter.api_key "${cleanVal}" && echo "OPENROUTER_API_KEY=${cleanVal}" >> /root/.hermes/.env && pm2 restart hermes-gateway || true`).catch(() => {});
+    } else if (agentType === 'groq') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'GROQ_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.groq.api_key "${cleanVal}" && echo "GROQ_API_KEY=${cleanVal}" >> /root/.hermes/.env && pm2 restart hermes-gateway || true`).catch(() => {});
+    } else if (agentType === 'cerebras') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'CEREBRAS_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.cerebras.api_key "${cleanVal}" && echo "CEREBRAS_API_KEY=${cleanVal}" >> /root/.hermes/.env && pm2 restart hermes-gateway || true`).catch(() => {});
+    } else if (agentType === 'sambanova') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'SAMBANOVA_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.sambanova.api_key "${cleanVal}" && echo "SAMBANOVA_API_KEY=${cleanVal}" >> /root/.hermes/.env && pm2 restart hermes-gateway || true`).catch(() => {});
+    } else if (agentType === 'mistral') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'MISTRAL_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.mistral.api_key "${cleanVal}" && echo "MISTRAL_API_KEY=${cleanVal}" >> /root/.hermes/.env && pm2 restart hermes-gateway || true`).catch(() => {});
+    } else if (agentType === 'atria') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'ATRIA_API_KEY', cleanVal, true);
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'CUSTOM_API_KEY', cleanVal, true);
+      const password = savedDep?.root_password || 'RamaGans76_';
+      await execSshCommand(fullIp, fullPort, password, `hermes config set providers.atria.api_key "${cleanVal}" && pm2 restart hermes-gateway || true`).catch(() => {});
     } else if (agentType === 'github') {
       await railway.setVariable(token, projectId, environmentId, serviceId, 'GITHUB_TOKEN', cleanVal, true);
     }
@@ -1030,10 +1083,16 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
       'agy': 'agy (atau ag)',
       'claude': 'claude (atau cl)',
       'opencode': 'opencode (atau oc)',
-      'gemini': 'agy',
+      'gemini': 'gemini-2.0-flash di /model atau agy',
       'deepseek': 'aider --model deepseek/...',
       'aider': 'aider (atau ai)',
-      'github': 'ai-backup (atau ai-sync status)'
+      'openrouter': 'Semua 12 model di OpenRouter langsung aktif!',
+      'groq': 'Llama-3.3 70B & DeepSeek-R1 Distill di Groq aktif!',
+      'cerebras': 'Llama-3.3 70B 2000 tps di Cerebras aktif!',
+      'sambanova': 'Llama 3.1 405B & DeepSeek-R1 di SambaNova aktif!',
+      'mistral': 'Codestral & Mistral Small aktif!',
+      'atria': 'Model Atria-Dawn-Preview aktif!',
+      'github': 'GitHub Models (GPT-4o, Llama) & Sync aktif!'
     };
     const cmdHint = cmdHintMap[agentType] || 'ai';
 
