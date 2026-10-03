@@ -784,7 +784,8 @@ async function handleShowAddAiAccountMenu(bot, chatId, messageId, projectId) {
     `• 🚀 *OpenCode AI* — OpenAI API Key (\`sk-...\`) / OpenCode Token\n` +
     `• 💎 *Google Gemini API Key* — (\`AIzaSy...\`)\n` +
     `• 🐋 *DeepSeek API Key* — (\`sk-...\`)\n` +
-    `• 🛡️ *Aider AI Assistant* — OpenAI / Anthropic / DeepSeek Key\n\n` +
+    `• 🛡️ *Aider AI Assistant* — OpenAI / Anthropic / DeepSeek Key\n` +
+    `• ☁️ *GitHub Token (Auto-Backup & Sync)* — (\`ghp_...\` / \`github_pat_...\`)\n\n` +
     `_Klik tombol AI Agent di bawah untuk memasukkan token/key:_`;
 
   const keyboard = {
@@ -800,6 +801,9 @@ async function handleShowAddAiAccountMenu(bot, chatId, messageId, projectId) {
       [
         { text: '🐋 DeepSeek API Key', callback_data: `ai_prompt_deepseek_${projectId}` },
         { text: '🛡️ Aider AI Key', callback_data: `ai_prompt_aider_${projectId}` }
+      ],
+      [
+        { text: '☁️ GitHub Token (Auto-Backup & Sync)', callback_data: `ai_prompt_github_${projectId}` }
       ],
       [
         { text: '🔙 Kembali ke Hub AI', callback_data: `vps_ai_${projectId}` },
@@ -831,7 +835,8 @@ async function handlePromptAiToken(bot, chatId, messageId, projectId, agentType)
     'opencode': 'OpenCode AI',
     'gemini': 'Google Gemini API',
     'deepseek': 'DeepSeek API',
-    'aider': 'Aider AI Assistant'
+    'aider': 'Aider AI Assistant',
+    'github': 'GitHub Cloud Auto-Backup'
   };
   const label = agentLabelMap[agentType] || 'AI Agent';
 
@@ -841,7 +846,8 @@ async function handlePromptAiToken(bot, chatId, messageId, projectId, agentType)
     'opencode': 'OpenAI API Key (sk-proj-...) atau Token OpenCode',
     'gemini': 'Gemini API Key dari Google AI Studio (AIzaSy...)',
     'deepseek': 'DeepSeek API Key (sk-...)',
-    'aider': 'OpenAI / Anthropic / DeepSeek API Key'
+    'aider': 'OpenAI / Anthropic / DeepSeek API Key',
+    'github': 'Personal Access Token GitHub (ghp_... atau github_pat_...) dengan izin repo'
   };
   const hint = hintMap[agentType] || 'Token / API Key';
 
@@ -887,7 +893,8 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
     'opencode': 'OpenCode AI',
     'gemini': 'Google Gemini API',
     'deepseek': 'DeepSeek API',
-    'aider': 'Aider AI Assistant'
+    'aider': 'Aider AI Assistant',
+    'github': 'GitHub Cloud Auto-Backup'
   };
   const label = agentLabelMap[agentType] || 'AI Agent';
 
@@ -950,6 +957,8 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
       if (cleanVal.startsWith('sk-')) {
         await railway.setVariable(token, projectId, environmentId, serviceId, 'OPENAI_API_KEY', cleanVal, true);
       }
+    } else if (agentType === 'github') {
+      await railway.setVariable(token, projectId, environmentId, serviceId, 'GITHUB_TOKEN', cleanVal, true);
     }
 
     await safeEditMessage(
@@ -968,7 +977,8 @@ async function executeSetAiToken(bot, chatId, projectId, agentType, tokenValue) 
       'opencode': 'opencode (atau oc)',
       'gemini': 'agy',
       'deepseek': 'aider --model deepseek/...',
-      'aider': 'aider (atau ai)'
+      'aider': 'aider (atau ai)',
+      'github': 'ai-backup (atau ai-sync status)'
     };
     const cmdHint = cmdHintMap[agentType] || 'ai';
 
@@ -1075,6 +1085,9 @@ async function executeResetAiAgent(bot, chatId, messageId, projectId, agentType)
     }
     if (agentType === 'freebuff' || agentType === 'all') {
       await railway.deleteVariable(token, projectId, environmentId, serviceId, 'AIDER_API_KEY');
+    }
+    if (agentType === 'all') {
+      await railway.deleteVariable(token, projectId, environmentId, serviceId, 'GITHUB_TOKEN');
     }
 
     // Trigger redeploy / restart
