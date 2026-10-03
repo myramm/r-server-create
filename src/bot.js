@@ -55,6 +55,9 @@ const {
   handlePromptAiToken,
   executeSetAiToken,
   executeResetAiAgent,
+  handleExecAiBackup,
+  handleExecAiRestore,
+  handleExecAiStatus
 } = require('./handlers/vpsHandler');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -322,6 +325,18 @@ bot.on('callback_query', async (query) => {
     const agentType = rest.substring(0, idx);
     const projectId = rest.substring(idx + 1);
     return handlePromptAiToken(bot, chatId, messageId, projectId, agentType);
+  }
+  if (data.startsWith('ai_exec_backup_')) {
+    const projectId = data.replace('ai_exec_backup_', '');
+    return handleExecAiBackup(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('ai_exec_restore_')) {
+    const projectId = data.replace('ai_exec_restore_', '');
+    return handleExecAiRestore(bot, chatId, messageId, projectId);
+  }
+  if (data.startsWith('ai_exec_status_')) {
+    const projectId = data.replace('ai_exec_status_', '');
+    return handleExecAiStatus(bot, chatId, messageId, projectId);
   }
   if (data.startsWith('ai_clean_')) {
     const rest = data.replace('ai_clean_', '');

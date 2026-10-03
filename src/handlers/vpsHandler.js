@@ -1,6 +1,22 @@
 const db = require('../services/database');
 const railway = require('../services/railway');
 const { safeSendMessage, safeEditMessage, getUserState } = require('../utils/telegram');
+const { exec } = require('child_process');
+
+function execSshCommand(host, port, password, cmd, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    if (!host || host === '-' || !port || !password) {
+      return reject(new Error('Informasi SSH (IP, Port, Password) belum lengkap.'));
+    }
+    const safeCmd = `sshpass -p '${password}' ssh -p ${port} -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=no root@${host} "${cmd}"`;
+    exec(safeCmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
+      if (error) {
+        return reject(new Error(stderr || error.message));
+      }
+      resolve(stdout.trim());
+    });
+  });
+}
 
 async function handleListProjects(bot, chatId, messageId) {
   const state = getUserState(chatId);
@@ -730,6 +746,13 @@ async function handleShowAiAgentsHub(bot, chatId, messageId, projectId) {
         { text: '➕ Tambah / Ganti Akun AI 🔑', callback_data: `ai_add_menu_${projectId}` }
       ],
       [
+        { text: '💾 Backup Data AI ☁️', callback_data: `ai_exec_backup_${projectId}` },
+        { text: '🔄 Restore Data Login ⚡', callback_data: `ai_exec_restore_${projectId}` }
+      ],
+      [
+        { text: '📊 Cek Status Login AI Agent 📋', callback_data: `ai_exec_status_${projectId}` }
+      ],
+      [
         { text: '⚡ Reset Antigravity (AGY)', callback_data: `ai_clean_agy_${projectId}` },
         { text: '🟣 Reset Claude Code', callback_data: `ai_clean_claude_${projectId}` }
       ],
@@ -1135,6 +1158,184 @@ async function executeResetAiAgent(bot, chatId, messageId, projectId, agentType)
   }
 }
 
+async function handleExecAiBackup(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMPROSES BACKUP DATA AI AGENTS...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ Mengarsip data token, login, prompt & config via SSH...`
+  );
+
+  try {
+    const details = token ? await railway.getProjectDetails(token, projectId).catch(() => null) : null;
+    const sshHost = details?.tcpHost || savedDep?.ssh_host;
+    const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+    const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+    const password = savedDep?.root_password || 'RamaGans76_';
+
+    const output = await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync backup');
+
+    const successText = `✅ *BACKUP DATA AI AGENTS BERHASIL!* 💾🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *Target VPS:* \`${details?.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${sshIp}:${sshPort}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📦 *LOKASI ARSIP BACKUP:*\n` +
+      `• \`/var/lib/ara/ai-backup/ai-agent-auth.tar.gz\`\n\n` +
+      `🔒 *DATA YANG BERHASIL DIAMANKAN:*\n` +
+      `• ⚡ Google Antigravity (\`.gemini/\` & \`GEMINI.md\`)\n` +
+      `• 🟣 Claude Code CLI (\`.claude/\` & \`.claude.json\`)\n` +
+      `• 🤖 Hermes Agent (\`.hermes/\` & \`SOUL.md\`)\n` +
+      `• 🚀 OpenCode AI (\`.config/opencode/\`)\n` +
+      `• 🛡️ Freebuff, Aider, Git & SSH config\n\n` +
+      `✨ *Semua data tersimpan dan akan otomatis di-restore saat container menyala ulang!*`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📊 Cek Status Login AI', callback_data: `ai_exec_status_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal membuat backup via SSH:*\n_${err.message}_\n\n💡 Pastikan server VPS dalam keadaan aktif (online).`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `ai_exec_backup_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
+        ]
+      }
+    });
+  }
+}
+
+async function handleExecAiRestore(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMPROSES RESTORE DATA AI AGENTS...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ Memulihkan token login & sesi ke /root/ via SSH...`
+  );
+
+  try {
+    const details = token ? await railway.getProjectDetails(token, projectId).catch(() => null) : null;
+    const sshHost = details?.tcpHost || savedDep?.ssh_host;
+    const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+    const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+    const password = savedDep?.root_password || 'RamaGans76_';
+
+    const output = await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync restore');
+
+    const successText = `✅ *RESTORE DATA AI AGENTS SELESAI!* ⚡🎉\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *Target VPS:* \`${details?.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${sshIp}:${sshPort}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `✨ *STATUS RESTORE:*\n` +
+      `• Seluruh token login, sesi, dan konfigurasi AI telah dipulihkan ke direktori \`/root/\`.\n` +
+      `• Anda bisa langsung menjalankan \`agy\`, \`claude\`, \`hermes\`, atau \`opencode\` tanpa perlu login ulang!`;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, successText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📊 Cek Status Login AI', callback_data: `ai_exec_status_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal restore data via SSH:*\n_${err.message}_\n\n💡 Pastikan server VPS dalam keadaan aktif (online).`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `ai_exec_restore_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
+        ]
+      }
+    });
+  }
+}
+
+async function handleExecAiStatus(bot, chatId, messageId, projectId) {
+  const state = getUserState(chatId);
+  const sysToken = db.getSystemRailwayToken();
+  const token = state.data?.railwayToken || sysToken;
+
+  const savedDep = db.getDeploymentByProjectId(projectId);
+  const vpsName = savedDep?.project_name || 'r-server';
+
+  const loadMsg = await safeSendMessage(
+    bot,
+    chatId,
+    `⏳ *MEMERIKSA STATUS LOGIN AI AGENTS...*\n\n` +
+    `🖥️ *Target VPS:* \`${vpsName}\`\n` +
+    `🆔 *Project ID:* \`${projectId}\`\n` +
+    `⏳ Mengambil data status langsung dari VPS...`
+  );
+
+  try {
+    const details = token ? await railway.getProjectDetails(token, projectId).catch(() => null) : null;
+    const sshHost = details?.tcpHost || savedDep?.ssh_host;
+    const sshIp = details?.tcpIp || savedDep?.ssh_host || sshHost;
+    const sshPort = details?.tcpPort || savedDep?.ssh_port || '22';
+    const password = savedDep?.root_password || 'RamaGans76_';
+
+    const output = await execSshCommand(sshIp || sshHost, sshPort, password, 'ai-sync status');
+
+    const statusText = `📊 *STATUS LOGIN & BACKUP AI AGENTS* 🤖\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🖥️ *Target VPS:* \`${details?.name || vpsName}\`\n` +
+      `🌐 *IP Address:* \`${sshIp}:${sshPort}\`\n` +
+      `🆔 *Project ID:* \`${projectId}\`\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `\`\`\`text\n${output}\n\`\`\``;
+
+    safeEditMessage(bot, chatId, loadMsg.message_id, statusText, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '💾 Backup Sekarang', callback_data: `ai_exec_backup_${projectId}` },
+            { text: '🔄 Restore Data', callback_data: `ai_exec_restore_${projectId}` }
+          ],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }],
+          [{ text: '🏠 Menu Utama', callback_data: 'menu_main' }]
+        ]
+      }
+    });
+  } catch (err) {
+    safeEditMessage(bot, chatId, loadMsg.message_id, `❌ *Gagal mengambil status via SSH:*\n_${err.message}_\n\n💡 Pastikan server VPS dalam keadaan aktif (online).`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Coba Lagi', callback_data: `ai_exec_status_${projectId}` }],
+          [{ text: '🤖 Hub AI Agents', callback_data: `vps_ai_${projectId}` }]
+        ]
+      }
+    });
+  }
+}
+
 module.exports = {
   handleListProjects,
   handleRestartProject,
@@ -1150,4 +1351,7 @@ module.exports = {
   handlePromptAiToken,
   executeSetAiToken,
   executeResetAiAgent,
+  handleExecAiBackup,
+  handleExecAiRestore,
+  handleExecAiStatus
 };
